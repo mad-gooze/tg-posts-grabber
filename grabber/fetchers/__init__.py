@@ -34,7 +34,9 @@ from .telegram_web import fetch_telegram  # noqa: E402
 # sources use type: rss with the subreddit's /.rss feed.
 FETCHERS = {
     "rss": lambda src, client: fetch_rss(src.name, src.url, client),
-    "html": lambda src, client: fetch_html(src.name, src.url, client),
+    "html": lambda src, client: fetch_html(
+        src.name, src.url, client, post_pattern=src.post_pattern or None, post_exclude=src.post_exclude or None
+    ),
     "telegram": lambda src, client: fetch_telegram(src.name, src.url, client),
     "slack": fetch_slack,
     "discord": fetch_discord,

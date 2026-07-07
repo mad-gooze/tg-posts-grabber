@@ -1,6 +1,8 @@
 # Sources for tg-grabber. type: rss | html | telegram | slack | discord | hn | bluesky
 #   html:     a blog index URL with no native feed; posts are scraped and dated via
-#             trafilatura (see grabber/fetchers/html.py)
+#             trafilatura (see grabber/fetchers/html.py). Optional post_pattern (regex
+#             matched against a link's URL path) selects posts when they don't sit one
+#             segment below the blog path; post_exclude drops false positives.
 #   telegram: public channel username (scraped via t.me/s/<name>)
 #   slack:    "<workspace-slug>/<channel-id>"; needs a user token (see docs/sources-setup.md)
 #   discord:  "<guild-id>/<channel-id>";       needs a user token (see docs/sources-setup.md)
@@ -594,6 +596,56 @@ sources:
     url: "https://blog.twitch.tv/en/feed/"
     enabled: false
 
+  # --- RSS: added 2026-07-08 (surfaced during html-source research; verified valid XML) ---
+  # WebRTC / RTC
+  - name: moq-dev
+    type: rss
+    url: "https://moq.dev/rss.xml"                  # Media-over-QUIC / kixelated (Luke Curley)
+  - name: pion-blog
+    type: rss
+    url: "https://pion.ly/blog/index.xml"           # pure-Go WebRTC deep dives (SCTP/FEC/data channels)
+  - name: metered
+    type: rss
+    url: "https://www.metered.ca/blog/feed"         # TURN/STUN/SFU infra
+  - name: getstream
+    type: rss
+    url: "https://getstream.io/blog/rss.xml"        # video/audio SDK, WebRTC, moderation
+  - name: eyeson
+    type: rss
+    url: "https://blog.eyeson.com/rss.xml"          # video-conferencing API/SFU
+  - name: bigbluebutton
+    type: rss
+    url: "https://bigbluebutton.org/articles/feed/" # OSS web conferencing (media stack on LiveKit/mediasoup)
+  # Codec / encoding / DRM
+  - name: mainconcept
+    type: rss
+    url: "https://blog.mainconcept.com/rss.xml"     # codec SDK vendor (HEVC/AVC/VVC/MV-HEVC), VMAF
+  - name: two-orioles
+    type: rss
+    url: "https://www.twoorioles.com/news-1?format=rss"  # Eve-AV1 encoder + dav1d authors
+  - name: beamr
+    type: rss
+    url: "https://blog.beamr.com/feed/"             # content-adaptive bitrate / compression
+  - name: castlabs
+    type: rss
+    url: "https://castlabs.com/feed/"               # DRM, forensic watermarking (STARDUSTmark), DAI
+  # OSS / engineer blogs
+  - name: codecs-mmcx
+    type: rss
+    url: "https://codecs.multimedia.cx/feed/"       # Kostya Shishkov — codec internals
+  - name: ryg-blog
+    type: rss
+    url: "https://fgiesen.wordpress.com/feed/"      # Fabian Giesen — low-level/compression
+  - name: rtcbits
+    type: rss
+    url: "http://feeds.feedburner.com/rtcbits"      # Gustavo Garcia — WebRTC infra
+  - name: owncast
+    type: rss
+    url: "https://owncast.online/news/index.xml"    # self-hosted live streaming
+  - name: jellyfin
+    type: rss
+    url: "https://jellyfin.org/posts/rss.xml"       # OSS media server
+
   # --- HTML blogs (no native RSS; index scraped via trafilatura) — added 2026-07-07 ---
   - name: fishjam
     type: html
@@ -601,6 +653,64 @@ sources:
   - name: nimble-ape
     type: html
     url: "https://nimblea.pe/blog"              # Nimble Ape — WebRTC/SRT/WHIP/MoQ, CommCon organisers
+
+  # --- HTML blogs: added 2026-07-08 (feed-verified absent; index scraped via trafilatura) ---
+  - name: livekit
+    type: html
+    url: "https://livekit.com/blog"             # open-source WebRTC SFU + realtime media infra
+  - name: 100ms
+    type: html
+    url: "https://100ms.live/blog"              # WebRTC SFU vendor — call quality, codecs, live
+  - name: jitsi
+    type: html
+    url: "https://jitsi.org/blog/"              # open-source Videobridge SFU: SSRC rewriting, large calls
+  - name: agora
+    type: html
+    url: "https://www.agora.io/en/blog/"        # major RTC SDK vendor (posts at /en/blog/<slug>)
+  - name: nanocosmos
+    type: html
+    url: "https://www.nanocosmos.net/blog/"     # ultra-low-latency (<1s) live streaming, MoQ (feed killed → 410)
+  - name: livepeer
+    type: html
+    url: "https://livepeer.org/blog"            # decentralized live-video transcoding + realtime AI video
+  - name: unified-streaming
+    type: html
+    url: "https://www.unified-streaming.com/blog"  # dynamic packaging, CMAF, DASH/HLS, DRM, origin
+  - name: ezdrm
+    type: html
+    url: "https://www.ezdrm.com/blog"           # multi-DRM (PlayReady/Widevine/FairPlay) as-a-service
+  - name: qualabs
+    type: html
+    url: "https://qualabs.com/blog/"            # video software engineering house: MoQ, live latency, AI-in-video
+  # SPA — if --fetch returns 0 items, set enabled: false (softer topic, telehealth-leaning)
+  - name: whereby
+    type: html
+    url: "https://whereby.com/blog"             # embeddable WebRTC video API
+
+  # --- HTML blogs needing a post_pattern (posts not one segment below the index path) ---
+  - name: discord-engineering
+    type: html
+    url: "https://discord.com/category/engineering"  # WebRTC voice at scale, DAVE E2EE A/V, "how it all goes live"
+    post_pattern: "^/blog/[a-z0-9-]+$"
+  - name: axinom
+    type: html
+    url: "https://www.axinom.com/media"         # multi-DRM + Mosaic OTT backend, DASH/CENC
+    post_pattern: "^/media/article/[a-z0-9-]+$"
+  - name: signalwire
+    type: html
+    url: "https://signalwire.com/blogs"         # RTC infra (softer: leans voice-AI now; prefilter gates)
+    post_pattern: "^/blogs/[a-z0-9-]+/[a-z0-9-]+$"
+  # codec vendor (AV1/HEVC/H.264, per-title, VMAF) — very on-topic, BUT blog posts sit at root
+  # /<slug>/ indistinguishable from product/marketing pages (aurora1-av1-encoder, use-cases, …),
+  # so the scraper leaks nav links (only ~1 of 15 is a real post). Left disabled — no reliable
+  # path rule separates posts from product pages. Codec content is partly covered by mainconcept,
+  # two-orioles and the AV1 GitHub feeds. Re-enable only if they move posts under /blog/<slug>.
+  - name: visionular
+    type: html
+    url: "https://www.visionular.ai/en/blog"
+    post_pattern: "^/[a-z0-9-]+/?$"
+    post_exclude: "^/(en|blog|about-us|contact-us|case-studies|faq|pricing|company|careers|solutions|products|resources|demo|privacy-policy|terms)/?$"
+    enabled: false
 
   # --- Telegram channels (public, scraped via t.me/s/) ---
   - name: mediares_video

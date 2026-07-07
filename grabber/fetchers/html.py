@@ -41,29 +41,48 @@ BYLINE_RE = re.compile(rf"\b({_MONTHS})\w*\.?\s+(\d{{1,2}}),?\s+(\d{{4}})\b")
 _MONTH_NUM = {m: i for i, m in enumerate(_MONTHS.split("|"), start=1)}
 
 
-def _discover_post_urls(base: str, client: httpx.Client) -> list[str]:
+def _discover_post_urls(
+    base: str,
+    client: httpx.Client,
+    post_pattern: str | None = None,
+    post_exclude: str | None = None,
+) -> list[str]:
     """Scrape the blog index at `base` for individual post URLs, newest-first.
 
-    Keeps same-origin links whose path is exactly one segment below the blog path
-    (e.g. /blog/<slug>), dropping pagination/listing segments and static assets.
+    Default mode keeps same-origin links whose path is exactly one segment below the
+    blog path (e.g. /blog/<slug>), dropping pagination/listing segments and assets.
+
+    When `post_pattern` is set (a regex matched against the URL path), that heuristic
+    is replaced: a same-origin link is a post iff its path matches `post_pattern` and,
+    when given, does NOT match `post_exclude`. This handles blogs whose posts don't
+    sit one segment below the index (e.g. root-level slugs, /media/article/<slug>).
+
     Order is preserved (blog indexes list newest first) and duplicates removed.
     """
     resp = client.get(base, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
+    inc = re.compile(post_pattern) if post_pattern else None
+    exc = re.compile(post_exclude) if post_exclude else None
     bp = urlparse(str(resp.url))  # follow_redirects may change the base
     prefix = bp.path.rstrip("/") + "/"
     out: list[str] = []
     for a in soup.find_all("a", href=True):
         p = urlparse(urljoin(str(resp.url), a["href"]))
-        if p.netloc != bp.netloc or not p.path.startswith(prefix):
+        if p.netloc != bp.netloc or p.path.lower().endswith(ASSET_EXTS):
             continue
-        rest = p.path[len(prefix):].strip("/")
-        if not rest or "/" in rest:  # empty (the index itself) or nested (not a leaf post)
-            continue
-        if rest.split(".")[0] in SKIP_SEGMENTS or p.path.lower().endswith(ASSET_EXTS):
-            continue
+        if inc is not None:  # regex mode: match the whole path against the pattern
+            if not inc.search(p.path) or (exc is not None and exc.search(p.path)):
+                continue
+        else:  # default: exactly one segment below the blog path
+            if not p.path.startswith(prefix):
+                continue
+            rest = p.path[len(prefix):].strip("/")
+            if not rest or "/" in rest:  # empty (the index itself) or nested (not a leaf post)
+                continue
+            if rest.split(".")[0] in SKIP_SEGMENTS:
+                continue
         clean = f"{p.scheme}://{p.netloc}{p.path}"
         if clean not in out:
             out.append(clean)
@@ -114,8 +133,15 @@ def _title(meta, url: str) -> str:
     return slug.replace("-", " ").strip().capitalize() or url
 
 
-def fetch_html(source_name: str, url: str, client: httpx.Client, max_posts: int = DEFAULT_MAX_POSTS) -> list[Item]:
-    post_urls = _discover_post_urls(url, client)
+def fetch_html(
+    source_name: str,
+    url: str,
+    client: httpx.Client,
+    max_posts: int = DEFAULT_MAX_POSTS,
+    post_pattern: str | None = None,
+    post_exclude: str | None = None,
+) -> list[Item]:
+    post_urls = _discover_post_urls(url, client, post_pattern, post_exclude)
     if not post_urls:
         raise ValueError(f"no post links found on {url} (index layout may have changed)")
 

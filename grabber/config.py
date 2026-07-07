@@ -29,6 +29,10 @@ class Source:
     token: str = ""  # resolved at load time from token_env; never set in sources.yaml
     proxy: bool = False  # fetch via SOCKS5_PROXY (source blocked on the local network)
     fetch_content: bool = True  # open the article URL and feed the LLM its full text (see CONTENT_FETCH_SKIP_TYPES)
+    # html-only: regex (matched against a link's URL path) selecting post URLs when they don't sit
+    # one segment below the blog path; post_exclude drops false positives (see grabber/fetchers/html.py)
+    post_pattern: str = ""
+    post_exclude: str = ""
 
 
 # source types that require an auth token, mapped to the default env var it lives in
