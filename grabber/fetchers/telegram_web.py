@@ -13,10 +13,15 @@ log = logging.getLogger(__name__)
 BG_IMAGE_RE = re.compile(r"background-image:\s*url\('([^']+)'\)")
 
 
-def fetch_telegram(source_name: str, channel: str, client: httpx.Client) -> list[Item]:
-    """Scrape the public preview page https://t.me/s/<channel> (last ~20 messages)."""
+def fetch_telegram(
+    source_name: str, channel: str, client: httpx.Client, before: int | None = None
+) -> list[Item]:
+    """Scrape the public preview page https://t.me/s/<channel> (last ~20 messages).
+
+    `before` pages backwards: returns the ~20 messages preceding that post ID.
+    """
     resp = client.get(
-        f"https://t.me/s/{channel}",
+        f"https://t.me/s/{channel}" + (f"?before={before}" if before else ""),
         headers={"User-Agent": USER_AGENT},
         follow_redirects=True,
     )

@@ -29,6 +29,8 @@ ON-TOPIC (relevant):
 - Engineering deep dives from video platforms, incl. Russian ones (Netflix, YouTube, Twitch, Кинопоиск, VK Видео, RuTube, Ozon, Kinescope…)
 - Conferences, meetups, webinars, podcasts and CFPs ABOUT video engineering (Demuxed, VideoTech, RTC@Scale, IEEE SPS, NAB/IBC…), incl. talk recordings — score by how technical the program is
 - Useful engineering resources: test-clip collections, glossaries, tutorials, awesome-lists, debugging tools
+- Playful engineering curiosities and pet projects: player/codec hacks, weird custom formats, \
+reverse-engineering of video features, community drama around video tools — the channel loves these
 - AI/ML only when tied to the video pipeline: super-resolution, neural codecs, video generation infra, translation/lipsync of video
 - Significant industry news with an engineering angle: standards, alliances, acquisitions, shutdowns, dev contests
 
@@ -41,8 +43,12 @@ OFF-TOPIC (reject):
 
 Score calibration:
 - 9-10: engineering deep dive, major codec/protocol/player/browser news, strong research report
-- 7-8: solid release notes, technical event announcement with a concrete program, good tool/resource
-- 5-6: on-topic but shallow or niche
+- 7-8: solid release notes, technical event announcement with a concrete program, good tool/resource; \
+also: podcast episodes on video/audio engineering, CFPs and announcements of recognized \
+video-engineering conferences/meetups (Demuxed, VideoTech, RTC@Scale…) even before the full program \
+is out, and fun engineering curiosities/pet projects — don't punish these for being "shallow", \
+being entertaining and on-topic is the point
+- 5-6: on-topic but thin or too niche; industry/market news with only a light engineering angle
 - 0-4: marketing, duplicates of common knowledge, off-topic
 
 Respond with STRICT JSON only, no markdown fences:

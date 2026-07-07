@@ -12,7 +12,7 @@ KEYWORDS: tuple[str, ...] = (
     "vvc", "vp8", "vp9", "evc", "lcevc", "codec", "dav1d", "libaom", "aomedia",
     "svt-av1", "rav1e", "x264", "x265", "vvenc", "mp4", "mkv", "webm", "mov",
     "jpeg", "jpg", "jxl", "webp", "avif", "heif", "heic", "png", "gif", "lottie",
-    "dolby", "atmos", "prores",
+    "dolby", "atmos", "prores", "image", "изображен",
     # audio
     "aac", "opus", "mp3", "flac", "vorbis", "xhe", "audio", "аудио", "звук",
     "voice", "голос", "speech",
