@@ -1,0 +1,334 @@
+# Sources for tg-grabber. type: rss | telegram (telegram = public channel username, scraped via t.me/s/<name>)
+# Disable a source with enabled: false instead of deleting it.
+
+sources:
+  # --- RSS: kept from the original sources.txt (verified alive 2026-07-07) ---
+  - name: hn-video-streaming
+    type: rss
+    url: "http://hnapp.com/rss?q=video%20streaming"
+  - name: netflix-techblog
+    type: rss
+    url: "https://medium.com/feed/netflix-techblog"
+  - name: dailymotion
+    type: rss
+    url: "https://medium.com/feed/dailymotion"
+  - name: brave-ventures
+    type: rss
+    url: "https://medium.com/feed/@BRaVeVentures"
+  - name: disruptive-wireless
+    type: rss
+    url: "https://disruptivewireless.blogspot.com/feeds/posts/default"
+  - name: workshop-media
+    type: rss
+    url: "https://www.workshop-media.co.uk/feed/"
+  - name: streamingmedia-industry-news
+    type: rss
+    url: "http://feeds.infotoday.com/StreamingMediaMagazine-IndustryNews"
+  # feedburner now redirects these to the Streaming Media HTML homepage (no XML);
+  # content duplicates streamingmedia-industry-news anyway
+  - name: onlinevideo-net
+    type: rss
+    url: "https://feeds.feedburner.com/ovnet"
+    enabled: false
+  - name: onlinevideo-headlines
+    type: rss
+    url: "https://feeds.feedburner.com/ovn-headlines"
+    enabled: false
+  - name: mux-blog
+    type: rss
+    url: "https://www.mux.com/blog/rss.xml"
+  - name: streamingmediablog
+    type: rss
+    url: "https://www.streamingmediablog.com/feed"
+
+  # --- RSS: new sources (verified alive 2026-07-07) ---
+  - name: cloudflare-video
+    type: rss
+    url: "https://blog.cloudflare.com/tag/video/rss/"
+  - name: aws-media
+    type: rss
+    url: "https://aws.amazon.com/blogs/media/feed/"
+  - name: ottverse
+    type: rss
+    url: "https://ottverse.com/feed/"
+  - name: streaming-learning-center
+    type: rss
+    url: "https://streaminglearningcenter.com/feed/"
+  - name: theoplayer
+    type: rss
+    url: "https://www.theoplayer.com/blog/rss.xml"
+  - name: wowza
+    type: rss
+    url: "https://www.wowza.com/blog/feed"
+  - name: svta
+    type: rss
+    url: "https://www.svta.org/feed/"
+  - name: webrtchacks
+    type: rss
+    url: "https://webrtchacks.com/feed/"
+  - name: meta-engineering
+    type: rss
+    url: "https://engineering.fb.com/feed/"
+  - name: vimeo-engineering
+    type: rss
+    url: "https://medium.com/feed/vimeo-engineering-blog"
+  - name: kaltura
+    type: rss
+    url: "https://corp.kaltura.com/blog/feed/"
+  - name: youtube-blog
+    type: rss
+    url: "https://blog.youtube/rss/"
+
+  # --- RSS: added 2026-07-07 (researched, verified valid XML feeds) ---
+  - name: broadcast-knowledge
+    type: rss
+    url: "https://www.thebroadcastknowledge.com/feed/"   # daily curated broadcast/streaming talks & webinars
+  - name: ffmpeg-news
+    type: rss
+    url: "https://ffmpeg.org/main.rss"                   # low volume, releases & project news
+  - name: aomedia
+    type: rss
+    url: "https://aomedia.org/feed.xml"                  # AV1/AV2 alliance announcements
+  - name: habr-video
+    type: rss
+    url: "https://habr.com/ru/rss/hub/video/articles/?fl=ru"  # Habr «Видео» hub (RU)
+  - name: softvelum
+    type: rss
+    url: "https://softvelum.com/blog/feed/"              # Nimble Streamer, SLDP, protocols
+  - name: ateme
+    type: rss
+    url: "https://www.ateme.com/feed/"                   # encoder vendor, codec-heavy posts
+  - name: netint
+    type: rss
+    url: "https://netint.com/feed/"                      # hardware encoding, Voices of Video
+  - name: red5
+    type: rss
+    url: "https://www.red5.net/feed/"                    # real-time streaming
+  - name: gumlet
+    type: rss
+    url: "https://www.gumlet.com/blog/rss/"              # video API vendor, tutorials
+  - name: disney-streaming
+    type: rss
+    url: "https://medium.com/feed/disney-streaming"
+  - name: hulu-tech
+    type: rss
+    url: "https://medium.com/feed/hulu-tech-blog"
+  - name: millicast
+    type: rss
+    url: "https://millicast.medium.com/feed"             # Dolby/Millicast WebRTC (updates rarely)
+  - name: obs-blog
+    type: rss
+    url: "https://obsproject.com/blog/rss"               # OBS releases
+  - name: tvtechnology
+    type: rss
+    url: "https://www.tvtechnology.com/feeds.xml"        # broadcast tech news
+  - name: hn-codecs
+    type: rss
+    url: "http://hnapp.com/rss?q=codec"                  # HN search: codec discussions
+  - name: reddit-videoengineering
+    type: rss
+    url: "https://www.reddit.com/r/VideoEngineering/.rss"  # community, incl. pro-AV/event video
+  - name: arxiv-multimedia
+    type: rss
+    url: "https://rss.arxiv.org/rss/cs.MM"               # research papers (channel loves perception/QoE studies)
+
+  # --- RSS: added 2026-07-07, discovered via links in existing sources ---
+  - name: wmspanel
+    type: rss
+    url: "https://blog.wmspanel.com/feeds/posts/default"  # Softvelum's WMSPanel/Nimble blog (19 refs from softvelum feed)
+  - name: mpeg
+    type: rss
+    url: "https://www.mpeg.org/feed/"                    # official MPEG standards news, low volume
+  - name: v-nova
+    type: rss
+    url: "https://v-nova.com/feed/"                      # LCEVC codec vendor
+  - name: broadpeak
+    type: rss
+    url: "https://broadpeak.tv/feed/"                    # CDN/streaming vendor
+  - name: meetecho
+    type: rss
+    url: "https://www.meetecho.com/blog/feed/"           # Janus WebRTC server devs
+
+  # --- Habr (added 2026-07-07): hub + company blogs; RU tech deep dives, event/conference announcements ---
+  - name: habr-image-processing
+    type: rss
+    url: "https://habr.com/ru/rss/hub/image_processing/articles/?fl=ru"
+  - name: habr-ivi
+    type: rss
+    url: "https://habr.com/ru/rss/companies/ivi/articles/"      # ivi — RU streaming service engineering
+  - name: habr-okko
+    type: rss
+    url: "https://habr.com/ru/rss/companies/okko/articles/"     # Okko — RU streaming service
+  - name: habr-yandex-infra
+    type: rss
+    url: "https://habr.com/ru/rss/companies/yandex_cloud_and_infra/articles/"  # incl. video platform team posts
+  - name: habr-vk
+    type: rss
+    url: "https://habr.com/ru/rss/companies/vk/articles/"       # broad, but VK Видео engineering posts land here
+  - name: habr-cdnvideo
+    type: rss
+    url: "https://habr.com/ru/rss/companies/cdnvideo/articles/"
+  - name: habr-gcore
+    type: rss
+    url: "https://habr.com/ru/rss/companies/gcorelabs/articles/"  # CDN/streaming infra
+  - name: habr-ontico
+    type: rss
+    url: "https://habr.com/ru/rss/companies/oleg-bunin/articles/"  # Ontico/HighLoad++ — conference talks & announcements
+  - name: habr-jugru
+    type: rss
+    url: "https://habr.com/ru/rss/companies/jugru/articles/"    # JUG Ru — runs VideoTech conference
+
+  # --- Events & conferences (added 2026-07-07) ---
+  - name: vsf
+    type: rss
+    url: "https://vsf.tv/feed/"                                 # Video Services Forum — VidTrans, tech retreats
+  - name: ieee-sps
+    type: rss
+    url: "https://signalprocessingsociety.org/rss.xml"          # IEEE SPS news & webinar series (incl. video coding)
+  - name: fosdem
+    type: rss
+    url: "https://fosdem.org/rss.xml"                           # annual; Open Media devroom CfP/schedule
+
+  # --- Beyond blogs (added 2026-07-07): GitHub/GitLab releases, YouTube, podcasts, aggregators ---
+  # All are Atom/RSS endpoints consumed by the same rss fetcher.
+
+  # OSS release feeds → "вышел новый релиз" post material (release notes included in entries)
+  - name: gh-shaka-player
+    type: rss
+    url: "https://github.com/shaka-project/shaka-player/releases.atom"
+  - name: gh-hlsjs
+    type: rss
+    url: "https://github.com/video-dev/hls.js/releases.atom"   # frequent patch releases; LLM should reject minor ones
+  - name: gh-dashjs
+    type: rss
+    url: "https://github.com/Dash-Industry-Forum/dash.js/releases.atom"
+  - name: gh-videojs
+    type: rss
+    url: "https://github.com/videojs/video.js/releases.atom"
+  - name: gh-gpac
+    type: rss
+    url: "https://github.com/gpac/gpac/releases.atom"
+  - name: gh-media3
+    type: rss
+    url: "https://github.com/androidx/media/releases.atom"     # ExoPlayer/Media3
+  - name: gh-srt
+    type: rss
+    url: "https://github.com/Haivision/srt/releases.atom"
+  - name: gh-janus
+    type: rss
+    url: "https://github.com/meetecho/janus-gateway/releases.atom"
+  - name: gh-obs
+    type: rss
+    url: "https://github.com/obsproject/obs-studio/releases.atom"
+  - name: gh-rav1e
+    type: rss
+    url: "https://github.com/xiph/rav1e/releases.atom"
+  - name: gh-vvenc
+    type: rss
+    url: "https://github.com/fraunhoferhhi/vvenc/releases.atom"  # Fraunhofer VVC encoder
+  - name: gl-svt-av1
+    type: rss
+    url: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/tags?format=atom"
+
+  # YouTube channels (Atom feeds with thumbnails → drafts get an image)
+  - name: yt-demuxed
+    type: rss
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCIc_DkRxo9UgUSTvWVNCmpA"  # Demuxed talks
+  - name: yt-mux
+    type: rss
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCGaddSlVSK83POSytkL21rQ"  # Mux
+  - name: yt-jan-ozer
+    type: rss
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC76FPAMmxSvATw_MX27ruLA"  # Jan Ozer codec videos
+
+  # Podcasts & aggregators
+  - name: podcast-voices-of-video
+    type: rss
+    url: "https://feeds.buzzsprout.com/2421803.rss"            # NETINT Voices of Video
+  - name: lobsters-video
+    type: rss
+    url: "https://lobste.rs/t/video.rss"                       # curated link aggregator, video tag
+  - name: gpac-blog
+    type: rss
+    url: "https://gpac.io/feed/"
+
+  # Doom9 — legendary codec forum; full-forum thread feed is mostly user Q&A, enable to experiment
+  - name: doom9
+    type: rss
+    url: "https://forum.doom9.org/external.php?type=RSS2"
+    enabled: false
+
+  # high-volume TV-business news — enable if you want more industry coverage (LLM will reject most)
+  - name: advanced-television
+    type: rss
+    url: "https://www.advanced-television.com/feed/"
+    enabled: false
+  - name: broadbandtvnews
+    type: rss
+    url: "https://www.broadbandtvnews.com/feed/"
+    enabled: false
+
+  # --- RSS: bot-blocked for plain curl; the fetcher uses a browser UA — disable if they keep failing ---
+  - name: bitmovin
+    type: rss
+    url: "https://bitmovin.com/blog/feed/"
+  - name: twitch-blog  # feed endpoint removed, redirects to HTML blog
+    type: rss
+    url: "https://blog.twitch.tv/en/feed/"
+    enabled: false
+
+  # --- Telegram channels (public, scraped via t.me/s/) ---
+  - name: mediares_video
+    type: telegram
+    url: "mediares_video"
+  - name: vcs_su
+    type: telegram
+    url: "vcs_su"
+  - name: avstream
+    type: telegram
+    url: "avstream"
+  - name: attvdesign
+    type: telegram
+    url: "attvdesign"
+  - name: obobtv
+    type: telegram
+    url: "obobtv"
+  - name: eventvideoengineer
+    type: telegram
+    url: "eventvideoengineer"
+  - name: inputpodcast
+    type: telegram
+    url: "inputpodcast"
+
+  # --- Telegram channels: added 2026-07-07 (verified active via t.me/s/) ---
+  - name: telesputnik
+    type: telegram
+    url: "telesputnik"        # Телеспутник — RU broadcast/OTT industry news
+  - name: cablemanru
+    type: telegram
+    url: "cablemanru"         # Кабельщик — RU pay-TV/OTT industry
+  - name: linkmeup_podcast
+    type: telegram
+    url: "linkmeup_podcast"   # linkmeup — networking/infra podcast
+
+  # --- Telegram channels: discovered via links/forwards in existing sources ---
+  - name: fourier_series
+    type: telegram
+    url: "fourier_series"     # «Ряды Фурье» — science; origin of the channel's perception/vision forwards (LLM filters the rest)
+  - name: standartforum
+    type: telegram
+    url: "standartforum"      # RU broadcast/AV engineering community (vMix, multi-venue productions)
+
+  # --- Telegram: conferences & events ---
+  - name: videotech_conf
+    type: telegram
+    url: "videotech_conf"     # VideoTech — RU video-engineering conference (JUG Ru)
+  - name: natexpo
+    type: telegram
+    url: "natexpo"            # НАТЭКСПО — RU broadcast industry expo
+
+# Removed from the original sources.txt:
+#   dead/broken: blog.streamroot.io, rss.hulu.com, scoop.it topic feed, bbc.co.uk/rd/blog/atom,
+#                tvnewscheck.com/playout/feed, feeds.brightcove.com/bc/all, blog.peer5.com,
+#                videodeveloper.io/feed/community
+#   auth-required (not scrapable by cron script): Discord, Slack, LinkedIn group
