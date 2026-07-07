@@ -141,6 +141,76 @@ sources:
     type: rss
     url: "https://www.meetecho.com/blog/feed/"           # Janus WebRTC server devs
 
+  # --- RSS: added 2026-07-07 (Perplexity search, verified valid XML + recent 2026 posts) ---
+  - name: webrtc-ventures
+    type: rss
+    url: "https://webrtc.ventures/feed/"                 # WebRTC consultancy; media-server deep dives (Janus, LiveKit, SFU scaling)
+  - name: digitalsamba
+    type: rss
+    url: "https://www.digitalsamba.com/blog/rss.xml"     # embedded video conferencing; WebRTC/MoQ/SVC engineering posts
+  - name: dacast
+    type: rss
+    url: "https://www.dacast.com/blog/feed/"             # streaming platform; codec (VVC/AV1) & workflow guides
+  - name: gstreamer-news
+    type: rss
+    url: "https://discourse.gstreamer.org/c/news/5.rss"  # official GStreamer release announcements & hackfest news
+  # UK broadcast (DTG) — mostly industry/policy news, some codec/HbbTV; enable for more broadcast coverage
+  - name: dtg
+    type: rss
+    url: "https://dtg.org.uk/feed/"
+    enabled: false
+  # OTT/SSAI vendor (Flicknexs) — ad-insertion & AVOD posts, but marketing-heavy; enable to try
+  - name: flicknexs
+    type: rss
+    url: "https://blog.flicknexs.com/feed/"
+    enabled: false
+
+  # --- RSS: added 2026-07-07 (web research, verified valid XML) — vendor & engineering blogs ---
+  - name: eyevinn
+    type: rss
+    url: "https://eyevinntechnology.medium.com/feed"    # open-source streaming consultancy; deep HLS/DASH/OSS write-ups
+  - name: jwplayer
+    type: rss
+    url: "https://www.jwplayer.com/feed/"               # player/OVP vendor; codec, DRM, delivery
+  - name: synamedia
+    type: rss
+    url: "https://www.synamedia.com/feed/"              # OTT/broadcast processing, ABR, QoE
+  - name: mediakind
+    type: rss
+    url: "https://www.mediakind.com/feed/"              # encoding/packaging/OTT platform (ex-Ericsson)
+  - name: dolby-optiview
+    type: rss
+    url: "https://optiview.dolby.com/feed/"             # Dolby streaming delivery/player/analytics (ex-THEO)
+  - name: daily-co
+    type: rss
+    url: "https://www.daily.co/blog/rss/"               # WebRTC real-time video infra, dev-focused
+  - name: norsk-id3as
+    type: rss
+    url: "https://norsk.video/feed/"                    # id3as Norsk — live media pipeline/SDK
+  - name: conviva
+    type: rss
+    url: "https://www.conviva.com/feed/"                # QoE/experience analytics
+  - name: zixi
+    type: rss
+    url: "https://www.zixi.com/feed/"                   # reliable IP transport (SRT/RIST space)
+  - name: api-video
+    type: rss
+    url: "https://api.video/rss.xml"                    # video API vendor; encoding/HLS/player tutorials
+
+  # --- Reddit (rss; JSON API blocks bots): added 2026-07-07 ---
+  - name: reddit-ffmpeg
+    type: rss
+    url: "https://www.reddit.com/r/ffmpeg/.rss"
+  - name: reddit-av1
+    type: rss
+    url: "https://www.reddit.com/r/AV1/.rss"
+  - name: reddit-broadcastengineering
+    type: rss
+    url: "https://www.reddit.com/r/broadcastengineering/.rss"
+  - name: reddit-webrtc
+    type: rss
+    url: "https://www.reddit.com/r/WebRTC/.rss"
+
   # --- Habr (added 2026-07-07): hub + company blogs; RU tech deep dives, event/conference announcements ---
   - name: habr-image-processing
     type: rss
@@ -154,6 +224,12 @@ sources:
   - name: habr-cgi
     type: rss
     url: "https://habr.com/ru/rss/hub/cgi/articles/?fl=ru"                # Habr «Работа с 3D-графикой» hub
+  - name: habr-sound
+    type: rss
+    url: "https://habr.com/ru/rss/hub/sound/articles/?fl=ru"              # Habr «Звук» hub — audio codecs/DSP (added 2026-07-07)
+  - name: habr-rutube
+    type: rss
+    url: "https://habr.com/ru/rss/companies/habr_rutube/articles/"  # RUTUBE — CDN scaling, player rewrite (added 2026-07-07)
   - name: habr-ivi
     type: rss
     url: "https://habr.com/ru/rss/companies/ivi/articles/"      # ivi — RU streaming service engineering
@@ -236,6 +312,111 @@ sources:
     type: rss
     url: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/tags?format=atom"
     prefilter: false  # release titles are bare version numbers
+  - name: gh-mediamtx
+    type: rss
+    url: "https://github.com/bluenviron/mediamtx/releases.atom"   # RTSP/RTMP/HLS/WebRTC media server (added 2026-07-07)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-ant-media
+    type: rss
+    url: "https://github.com/ant-media/Ant-Media-Server/releases.atom"  # low-latency WebRTC streaming engine (added 2026-07-07)
+    prefilter: false  # release titles are bare version numbers
+
+  # --- OSS release feeds: added 2026-07-07 (web research, verified valid atom) ---
+  # Encoders / codecs / quality analysis
+  - name: gh-dav1d
+    type: rss
+    url: "https://github.com/videolan/dav1d/releases.atom"               # VideoLAN AV1 decoder (GitHub mirror; canonical GitLab is bot-walled)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-libvpx
+    type: rss
+    url: "https://github.com/webmproject/libvpx/releases.atom"           # reference VP8/VP9 codec
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-openh264
+    type: rss
+    url: "https://github.com/cisco/openh264/releases.atom"               # Cisco H.264 codec
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-vvdec
+    type: rss
+    url: "https://github.com/fraunhoferhhi/vvdec/releases.atom"          # Fraunhofer VVC decoder (pairs with gh-vvenc)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-svt-av1-psy
+    type: rss
+    url: "https://github.com/psy-ex/svt-av1-psy/releases.atom"           # psychovisual SVT-AV1 fork
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-libavif
+    type: rss
+    url: "https://github.com/AOMediaCodec/libavif/releases.atom"         # AVIF (AV1 stills)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-libheif
+    type: rss
+    url: "https://github.com/strukturag/libheif/releases.atom"          # HEIF/HEIC + AVIF container
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-libjxl
+    type: rss
+    url: "https://github.com/libjxl/libjxl/releases.atom"               # JPEG XL reference codec
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-fdk-aac
+    type: rss
+    url: "https://github.com/mstorsjo/fdk-aac/releases.atom"            # Fraunhofer AAC audio codec
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-opus
+    type: rss
+    url: "https://github.com/xiph/opus/releases.atom"                  # Xiph Opus audio codec
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-vmaf
+    type: rss
+    url: "https://github.com/Netflix/vmaf/releases.atom"              # Netflix VMAF quality metric
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-av1an
+    type: rss
+    url: "https://github.com/master-of-zen/Av1an/releases.atom"       # chunked parallel AV1 encoding tool
+    prefilter: false  # release titles are bare version numbers
+  # Streaming servers / tooling
+  - name: gh-srs
+    type: rss
+    url: "https://github.com/ossrs/srs/releases.atom"                 # SRS live streaming cluster (RTMP/HLS/WebRTC/SRT)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-ovenmediaengine
+    type: rss
+    url: "https://github.com/AirenSoft/OvenMediaEngine/releases.atom" # sub-second LLHLS/WebRTC server
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-livekit
+    type: rss
+    url: "https://github.com/livekit/livekit/releases.atom"          # open WebRTC SFU
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-pion-webrtc
+    type: rss
+    url: "https://github.com/pion/webrtc/releases.atom"              # pure-Go WebRTC stack
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-owncast
+    type: rss
+    url: "https://github.com/owncast/owncast/releases.atom"          # self-hosted live streaming
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-gstreamer
+    type: rss
+    url: "https://github.com/GStreamer/gstreamer/releases.atom"  # GStreamer multimedia framework (GitHub mirror; canonical GitLab is bot-walled)
+    prefilter: false  # release titles are bare version numbers
+  # Packaging / players
+  - name: gh-shaka-packager
+    type: rss
+    url: "https://github.com/shaka-project/shaka-packager/releases.atom"  # DASH/HLS packager + DRM
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-bento4
+    type: rss
+    url: "https://github.com/axiomatic-systems/Bento4/releases.atom"     # MP4/DASH/HLS/CMAF toolkit
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-tsduck
+    type: rss
+    url: "https://github.com/tsduck/tsduck/releases.atom"               # MPEG transport-stream toolkit (broadcast/DVB)
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-mpv
+    type: rss
+    url: "https://github.com/mpv-player/mpv/releases.atom"              # reference power-user player
+    prefilter: false  # release titles are bare version numbers
+  - name: gh-vidstack
+    type: rss
+    url: "https://github.com/vidstack/player/releases.atom"            # modern web player toolkit
+    prefilter: false  # release titles are bare version numbers
 
   # YouTube channels (Atom feeds with thumbnails → drafts get an image)
   - name: yt-demuxed
@@ -247,11 +428,20 @@ sources:
   - name: yt-jan-ozer
     type: rss
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC76FPAMmxSvATw_MX27ruLA"  # Jan Ozer codec videos
+  - name: yt-fraunhofer-hhi
+    type: rss
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC2Xn9I2d4lGfuHg4L_LCQuA"  # Fraunhofer HHI — VVC/H.266 research talks (added 2026-07-07)
+  - name: yt-bitmovin
+    type: rss
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCsT4fxxfltdnuwPfSB4Xn4Q"  # Bitmovin talks/webinars (added 2026-07-07)
 
   # Podcasts & aggregators
   - name: podcast-voices-of-video
     type: rss
     url: "https://feeds.buzzsprout.com/2421803.rss"            # NETINT Voices of Video
+  - name: podcast-video-insiders
+    type: rss
+    url: "https://feeds.simplecast.com/BYKedFlb"               # The Video Insiders (Beamr) — codecs/encoding (added 2026-07-07)
   - name: lobsters-video
     type: rss
     url: "https://lobste.rs/t/video.rss"                       # curated link aggregator, video tag
@@ -314,6 +504,9 @@ sources:
   - name: cablemanru
     type: telegram
     url: "cablemanru"         # Кабельщик — RU pay-TV/OTT industry
+  - name: DniMedialogistiki
+    type: telegram
+    url: "DniMedialogistiki"  # Дни Медиалогистики — RU media/telecom & OTT industry news (added 2026-07-07)
   - name: linkmeup_podcast
     type: telegram
     url: "linkmeup_podcast"   # linkmeup — networking/infra podcast
@@ -341,6 +534,24 @@ sources:
   - name: hn-ffmpeg
     type: hn
     url: "ffmpeg"
+  - name: hn-moq
+    type: hn
+    url: "media over quic"        # MoQ transport — hot 2026 topic (added 2026-07-07)
+  - name: hn-webrtc
+    type: hn
+    url: "webrtc low latency"     # sub-second streaming, SFU scaling (added 2026-07-07)
+  - name: hn-video-codec
+    type: hn
+    url: "video codec"            # added 2026-07-07
+  - name: hn-vvc
+    type: hn
+    url: "vvc"                    # H.266/VVC discussions (added 2026-07-07)
+  - name: hn-hls-dash
+    type: hn
+    url: "HLS DASH"              # adaptive bitrate / player threads (added 2026-07-07)
+  - name: hn-drm
+    type: hn
+    url: "DRM widevine"         # content protection discussions (added 2026-07-07)
 
   # --- Bluesky (public API, no auth). url = a handle → that account's posts.
   #     "search:<query>" is also supported but the search endpoint bot-blocks unauth requests,
@@ -348,6 +559,12 @@ sources:
   - name: bsky-mux
     type: bluesky
     url: "mux.com"
+  - name: bsky-timmerer
+    type: bluesky
+    url: "timmerer.com"           # Christian Timmerer, Bitmovin CIO — streaming/QoE (added 2026-07-07)
+  - name: bsky-demuxed
+    type: bluesky
+    url: "demuxed.com"            # official Demuxed conference account (added 2026-07-07)
 
   # --- YouTube channels via the existing rss fetcher (channel-feed URL; see docs/sources-setup.md) ---
   # - name: yt-demuxed
