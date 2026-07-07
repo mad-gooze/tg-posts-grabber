@@ -7,6 +7,9 @@ dist/
 .env
 .ELIZA_TOKEN
 state.sqlite
+survey_cache.sqlite
+source_scores.csv
+source_scores.json
 __pycache__/
 .claude/
 # superseded by sources.yaml, kept locally for reference
