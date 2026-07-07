@@ -46,12 +46,28 @@ def fetch_content(url: str, client: httpx.Client) -> str | None:
 
     Uses the passed client (direct or proxied) so blocked sources still resolve.
     """
+    return fetch_content_meta(url, client)[0]
+
+
+def fetch_content_meta(url: str, client: httpx.Client) -> tuple[str | None, str | None]:
+    """Fetch `url` once and return (extracted markdown, og:image URL), each None on failure.
+
+    The image comes from trafilatura's page metadata, so the caller can reuse this single
+    GET instead of re-downloading the page later just to scrape og:image.
+    """
     if not url:
-        return None
+        return None, None
     try:
         resp = client.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
         resp.raise_for_status()
-        return extract_content(resp.text)
     except Exception as e:
         log.info("content fetch failed for %s (%s), falling back to snippet", url, e)
-        return None
+        return None, None
+    md = extract_content(resp.text)
+    image = None
+    try:
+        meta = trafilatura.extract_metadata(resp.text)
+        image = getattr(meta, "image", None) or None
+    except Exception:
+        pass
+    return md, image

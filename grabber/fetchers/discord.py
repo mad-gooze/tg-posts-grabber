@@ -5,6 +5,7 @@ import httpx
 
 from ..config import Source
 from . import Item
+from ._http import get_json
 
 log = logging.getLogger(__name__)
 
@@ -19,18 +20,18 @@ def fetch_discord(src: Source, client: httpx.Client) -> list[Item]:
     if not channel:
         raise ValueError(f"discord url must be '<guild_id>/<channel_id>', got {src.url!r}")
 
-    resp = client.get(
+    messages = get_json(
+        client,
         f"https://discord.com/api/v10/channels/{channel}/messages",
+        src.name,
         params={"limit": 50},
         headers={"Authorization": src.token},
     )
-    if resp.status_code == 429:
-        log.warning("%s: rate limited, skipping this run", src.name)
+    if messages is None:
         return []
-    resp.raise_for_status()
 
     items = []
-    for msg in resp.json():
+    for msg in messages:
         text = msg.get("content", "").strip()
         if not text:
             continue  # embed/attachment-only message: nothing to classify

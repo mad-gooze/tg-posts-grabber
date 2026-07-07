@@ -17,15 +17,21 @@ class Notifier:
     def _call(self, method: str, payload: dict) -> httpx.Response:
         return self.client.post(API.format(token=self.token, method=method), json=payload)
 
+    # Telegram caps a photo caption at 1024 chars but a text message at 4096; a message
+    # longer than this would be silently truncated as a caption, so it goes out as text
+    PHOTO_CAPTION_LIMIT = 1024
+
     def send_draft(self, message_html: str, image_url: str | None):
         """Send one draft; falls back photo→text and HTML→plain so a draft is never lost."""
-        if image_url:
+        # only use the photo path when the whole message fits in a caption; otherwise the
+        # text would be cut off, so send it in full via sendMessage below instead
+        if image_url and len(message_html) <= self.PHOTO_CAPTION_LIMIT:
             resp = self._call(
                 "sendPhoto",
                 {
                     "chat_id": self.chat_id,
                     "photo": image_url,
-                    "caption": message_html[:1024],
+                    "caption": message_html,
                     "parse_mode": "HTML",
                 },
             )

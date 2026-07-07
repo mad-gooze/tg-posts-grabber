@@ -160,6 +160,9 @@ def fetch_html(
                     url=post_url,
                     title=_title(meta, post_url),
                     text=(md or "")[:3000],
+                    # keep the full extraction so the enrich phase reuses it instead of
+                    # re-downloading this same page (extract_content already capped it)
+                    content=md or "",
                     published=_byline_date(md) or _meta_date(meta),
                     image_url=getattr(meta, "image", None),
                 )

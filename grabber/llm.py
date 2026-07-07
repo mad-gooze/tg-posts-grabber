@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 
 import httpx
 from openai import OpenAI
@@ -9,6 +10,10 @@ from .config import Config, STYLE_EXAMPLES
 from .fetchers import Item
 
 log = logging.getLogger(__name__)
+
+# transient HTTP statuses worth retrying on the Anthropic path (the OpenAI SDK path
+# retries these itself); 429 = rate limit, 529 = Anthropic "overloaded"
+_RETRY_STATUSES = {408, 429, 500, 502, 503, 529}
 
 _CLASSIFY_BODY = """\
 You are a content curator for the Russian Telegram channel «Страдания юного видеоинженера» \
@@ -103,9 +108,13 @@ DRAFT_SYSTEM_TEMPLATE = """\
 {{"title": "заголовок без разметки", "text": "текст поста в HTML-разметке Telegram (<b>, <i>, <a href=\\"...\\">), заголовок в text НЕ повторять, ссылку на источник НЕ вставлять — она добавится автоматически, максимум 700 символов"}}"""
 
 
+def _strip_fences(raw: str) -> str:
+    """Drop a leading ```/```json fence and a trailing ``` so bare JSON survives."""
+    return re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
+
+
 def _parse_json(raw: str) -> dict:
-    text = raw.strip()
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    text = _strip_fences(raw)
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise ValueError(f"no JSON object in LLM response: {raw[:200]!r}")
@@ -113,8 +122,7 @@ def _parse_json(raw: str) -> dict:
 
 
 def _parse_json_array(raw: str) -> list:
-    text = raw.strip()
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    text = _strip_fences(raw)
     start, end = text.find("["), text.rfind("]")
     if start == -1 or end == -1:
         raise ValueError(f"no JSON array in LLM response: {raw[:200]!r}")
@@ -187,6 +195,26 @@ class LLM:
             parts.append(s)
         return "; ".join(parts) or "no LLM calls"
 
+    def _post_with_retry(self, url: str, headers: dict, payload: dict, attempts: int = 3) -> httpx.Response:
+        """POST with exponential backoff on transient network errors and retryable status
+        codes. The OpenAI SDK path retries on its own; this Anthropic path previously did a
+        single post, so one transient 429/5xx dropped a whole classify batch or draft."""
+        delay = 1.0
+        for attempt in range(1, attempts + 1):
+            last = attempt == attempts
+            try:
+                resp = self.http.post(url, headers=headers, json=payload)
+            except httpx.RequestError as e:
+                if last:
+                    raise
+                log.warning("LLM request error (%s); retry %d/%d in %.0fs", e, attempt, attempts - 1, delay)
+            else:
+                if resp.status_code not in _RETRY_STATUSES or last:
+                    return resp
+                log.warning("LLM HTTP %s; retry %d/%d in %.0fs", resp.status_code, attempt, attempts - 1, delay)
+            time.sleep(delay)
+            delay *= 2
+
     def _chat_raw(
         self,
         system: str,
@@ -198,9 +226,11 @@ class LLM:
         disable_thinking: bool = False,
     ) -> str:
         if self.anthropic:
-            # cache_control is honored only if the prefix clears the model's minimum
-            # cacheable size (4096 tokens on current Opus) and the endpoint supports it;
-            # otherwise it's silently ignored — check usage_summary() cache counters
+            # cache_control is honored only if the cached prefix clears the model's minimum
+            # cacheable size and the endpoint supports it, else it's silently ignored. The
+            # eliza endpoint honors it well below the ~1024-token floor claimed for Opus —
+            # measured cache hits at ~1.4K (classify) and ~2.8K (draft) system prompts.
+            # Confirm via the cache_read/cache_write counters in usage_summary().
             system_payload = (
                 [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
                 if cache_system
@@ -217,20 +247,23 @@ class LLM:
                 # field is omitted, which prepends a thinking block and spends output
                 # tokens; classification doesn't need it. (Fable 5 rejects "disabled".)
                 payload["thinking"] = {"type": "disabled"}
-            resp = self.http.post(
+            resp = self._post_with_retry(
                 f"{self.base_url}/v1/messages",
-                headers={
+                {
                     "authorization": f"OAuth {self.api_key}",
                     "x-api-key": self.api_key,
                     "anthropic-version": "2023-06-01",
                 },
-                json=payload,
+                payload,
             )
             resp.raise_for_status()
             data = resp.json()
             self._track(kind, data.get("usage") or {})
             # skip any leading thinking blocks — take the first text block
-            return next(b["text"] for b in data["content"] if b.get("type") == "text")
+            text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
+            if text_block is None:
+                raise ValueError(f"no text block in LLM response: {data.get('content')!r}")
+            return text_block["text"]
         resp = self.client.chat.completions.create(
             model=model,
             messages=[
@@ -266,6 +299,7 @@ class LLM:
                     user,
                     "classify",
                     self.classify_model,
+                    cache_system=True,  # identical ~1.4K-token system prompt across every batch in a run
                     max_tokens=max(1024, 128 * len(items)),
                     disable_thinking=True,
                 )
@@ -302,6 +336,8 @@ class LLM:
                 user,
                 "cluster",
                 self.classify_model,
+                # no cache_system: cluster runs once per run, so a cache write would never be
+                # read back — it'd cost ~1.25x with no payoff (unlike the repeated classify batches)
                 max_tokens=max(512, 64 * n),
                 disable_thinking=True,
             )

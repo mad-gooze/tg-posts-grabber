@@ -6,6 +6,7 @@ import httpx
 
 from ..config import Source
 from . import Item
+from ._http import get_json
 
 log = logging.getLogger(__name__)
 
@@ -30,16 +31,15 @@ def fetch_slack(src: Source, client: httpx.Client) -> list[Item]:
     if not channel:
         raise ValueError(f"slack url must be '<workspace-slug>/<channel_id>', got {src.url!r}")
 
-    resp = client.get(
+    data = get_json(
+        client,
         "https://slack.com/api/conversations.history",
+        src.name,
         params={"channel": channel, "limit": 50},
         headers={"Authorization": f"Bearer {src.token}"},
     )
-    if resp.status_code == 429:
-        log.warning("%s: rate limited, skipping this run", src.name)
+    if data is None:
         return []
-    resp.raise_for_status()
-    data = resp.json()
     if not data.get("ok"):
         raise ValueError(data.get("error", "unknown slack error"))
 

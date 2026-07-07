@@ -4,6 +4,7 @@ from datetime import datetime
 import httpx
 
 from . import Item
+from ._http import get_json
 from .rss import _strip_html
 
 log = logging.getLogger(__name__)
@@ -11,17 +12,17 @@ log = logging.getLogger(__name__)
 
 def fetch_hn(src, client: httpx.Client) -> list[Item]:
     """Search Hacker News stories (newest first) via the Algolia API. src.url = query string."""
-    resp = client.get(
+    data = get_json(
+        client,
         "https://hn.algolia.com/api/v1/search_by_date",
+        src.name,
         params={"query": src.url, "tags": "story", "hitsPerPage": 50},
     )
-    if resp.status_code == 429:
-        log.warning("%s: rate limited, skipping this run", src.name)
+    if data is None:
         return []
-    resp.raise_for_status()
 
     items = []
-    for hit in resp.json().get("hits", []):
+    for hit in data.get("hits", []):
         object_id = hit.get("objectID")
         if not object_id:
             continue

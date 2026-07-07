@@ -4,6 +4,7 @@ from datetime import datetime
 import httpx
 
 from . import Item
+from ._http import get_json
 
 log = logging.getLogger(__name__)
 
@@ -44,20 +45,14 @@ def _post_to_item(source_name: str, post: dict) -> Item | None:
 def fetch_bluesky(src, client: httpx.Client) -> list[Item]:
     """Read Bluesky posts (no auth). src.url = handle, or 'search:<query>'."""
     if src.url.startswith("search:"):
-        resp = client.get(
-            f"{APPVIEW}/app.bsky.feed.searchPosts",
-            params={"q": src.url[len("search:"):], "limit": 50, "sort": "latest"},
-        )
+        url = f"{APPVIEW}/app.bsky.feed.searchPosts"
+        params = {"q": src.url[len("search:"):], "limit": 50, "sort": "latest"}
     else:
-        resp = client.get(
-            f"{APPVIEW}/app.bsky.feed.getAuthorFeed",
-            params={"actor": src.url, "limit": 50, "filter": "posts_no_replies"},
-        )
-    if resp.status_code == 429:
-        log.warning("%s: rate limited, skipping this run", src.name)
+        url = f"{APPVIEW}/app.bsky.feed.getAuthorFeed"
+        params = {"actor": src.url, "limit": 50, "filter": "posts_no_replies"}
+    data = get_json(client, url, src.name, params=params)
+    if data is None:
         return []
-    resp.raise_for_status()
-    data = resp.json()
 
     items = []
     if "posts" in data:  # searchPosts

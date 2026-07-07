@@ -21,10 +21,23 @@ in `state.sqlite`; set `FETCH_FULL_CONTENT=0` to fall back to feed snippets only
 ./bootstrap.sh
 ```
 
-Interactive: prompts for every token (required and optional), installs deps into `.venv`,
-writes `.env`, seeds `state.sqlite` (`--init`, so the first run doesn't flood you), installs
-the cron entry, and does a dry-run first run. Safe to re-run. The manual steps below are the
-same thing by hand.
+Interactive: prompts for every token (required and optional), installs deps into `.venv`
+(uses `uv` when present, dependencies read from `pyproject.toml`), writes `.env`, seeds
+`state.sqlite` (`--init`, so the first run doesn't flood you), installs the cron entry, and
+does a dry-run first run. Safe to re-run. The manual steps below are the same thing by hand.
+
+**Unattended / server setup.** Run non-interactively by supplying config via the environment
+(no TTY needed — piping into the script also triggers this mode):
+
+```bash
+LLM_BASE_URL=… LLM_API_KEY=… LLM_MODEL=… \
+TG_BOT_TOKEN=… TG_CHAT_ID=… ./bootstrap.sh -y
+```
+
+Optional env: `SLACK_TOKEN`, `DISCORD_TOKEN`, `SOCKS5_PROXY`, the tuning vars below, and
+`SEND_ON_BOOTSTRAP=1` to send the first drafts for real (default is dry-run only). Pass
+`--systemd` to install a `systemd --user` timer instead of cron (also the automatic fallback
+on hosts without `crontab`); see [Scheduling](#scheduling-4day).
 
 ## Setup
 
@@ -60,13 +73,17 @@ rotating token can live in its own gitignored file.
 .venv/bin/python -m grabber             # real run, drafts arrive in Telegram
 ```
 
-## Cron (4×/day)
+## Scheduling (4×/day)
 
 ```cron
 0 9,13,17,21 * * * cd $HOME/tg-grabber && .venv/bin/python -m grabber >> grabber.log 2>&1
 ```
 
 `crontab -e`, paste, done. Any cadence works — dedupe is stateful, nothing is sent twice.
+
+On a server without cron, use a `systemd --user` timer instead (`bootstrap.sh --systemd`
+generates the units, or write them by hand under `~/.config/systemd/user/`). Enable
+`loginctl enable-linger $USER` so the timer fires without an active login.
 
 ## Tuning
 

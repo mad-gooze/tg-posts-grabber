@@ -11,6 +11,9 @@ dependencies = [
     "openai>=1.40",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
+    # required for the Anthropic path against endpoints behind a corporate CA (llm.py);
+    # without it the import falls back to certifi and TLS fails on internal endpoints
+    "truststore>=0.9",
 ]
 
 [tool.uv]

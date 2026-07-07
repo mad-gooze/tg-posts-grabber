@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from .config import CONTENT_FETCH_SKIP_TYPES, Config, Source, STATE_DB, USER_AGENT, load_config
-from .content import fetch_content
+from .content import fetch_content_meta
 from .dedup import content_key, hamming_close, normalize_url
 from .fetchers import FETCHERS, PREFILTER_EXEMPT_TYPES, Item
 from .llm import LLM
@@ -35,10 +35,10 @@ class Group:
     classification: dict | None = None
 
 
-def _pick_representative(members: list[Item], by_score: bool) -> Item:
-    """Pre-classify (by_score=False): longest text, tie-break earliest published — a proxy
-    for the most substantial write-up. Post-merge (by_score=True): handled by the caller
-    from group scores, so this branch just falls back to the same heuristic."""
+def _pick_representative(members: list[Item]) -> Item:
+    """Pick the group's representative: longest text, tie-break earliest published — a proxy
+    for the most substantial write-up. (Post-merge, the caller overrides this from group
+    scores, so this heuristic only decides pre-classification representatives.)"""
     epoch = datetime.min.replace(tzinfo=timezone.utc)
     return min(members, key=lambda m: (-len(m.text), m.published or epoch))
 
@@ -66,7 +66,7 @@ def _group_lexically(items: list[Item]) -> list[Group]:
     buckets: dict[int, list[Item]] = {}
     for i, item in enumerate(items):
         buckets.setdefault(find(i), []).append(item)
-    return [Group(members=m, representative=_pick_representative(m, by_score=False)) for m in buckets.values()]
+    return [Group(members=m, representative=_pick_representative(m)) for m in buckets.values()]
 
 
 @contextmanager
@@ -258,6 +258,9 @@ def enrich_groups(cfg: Config, groups: list[Group], state: State, proxied_source
             continue
         if not rep.url.lower().startswith(("http://", "https://")):
             continue
+        if rep.content:  # fetcher already extracted the page (e.g. html sources) — don't refetch
+            cached += 1
+            continue
         hit = state.get_content(rep.norm_url)
         if hit:
             rep.content = hit
@@ -272,18 +275,21 @@ def enrich_groups(cfg: Config, groups: list[Group], state: State, proxied_source
                 futures = {}
                 for rep in todo:
                     use_proxy = rep.source in proxied_sources and proxied is not None
-                    futures[pool.submit(fetch_content, rep.url, proxied if use_proxy else direct)] = rep
+                    futures[pool.submit(fetch_content_meta, rep.url, proxied if use_proxy else direct)] = rep
                 for future in as_completed(futures):
                     rep = futures[future]
                     try:
-                        md = future.result()
-                    except Exception as e:  # fetch_content swallows its own errors; belt and suspenders
+                        md, image = future.result()
+                    except Exception as e:  # fetch_content_meta swallows its own errors; belt and suspenders
                         log.info("content enrich failed for %s (%s)", rep.url, e)
-                        md = None
+                        md, image = None, None
                     if md:
                         rep.content = md
                         state.set_content(rep.norm_url, md)
                         fetched += 1
+                    # reuse this fetch's og:image so the draft loop needn't re-download the page
+                    if image and not rep.image_url:
+                        rep.image_url = image
 
     if cached or todo:
         log.info(
@@ -417,7 +423,8 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
             log.warning("draft failed for %s (%s), leaving for next run", rep.url, e)
             continue
 
-        # article pages of blocked sources are blocked too — look up og:image via proxy
+        # rep.image_url is set from the feed or captured during enrich; only when neither
+        # yielded one do we spend a page GET here (blocked sources go through the proxy)
         image = rep.image_url
         if not image and rep.url:
             image = og_image(rep.url, cfg.socks5_proxy if rep.source in proxied_sources else None)

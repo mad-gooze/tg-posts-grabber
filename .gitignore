@@ -5,6 +5,7 @@ dist/
 .DS_Store
 .venv/
 .env
+.env.bak
 .ELIZA_TOKEN
 state.sqlite
 survey_cache.sqlite
