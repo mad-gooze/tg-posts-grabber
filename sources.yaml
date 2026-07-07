@@ -260,6 +260,124 @@ sources:
     type: rss
     url: "https://fosdem.org/rss.xml"                           # annual; Open Media devroom CfP/schedule
 
+  # --- Video-tech meetups (added 2026-07-07): the Demuxed list https://www.demuxed.com/meetups ---
+  # Meetup's native per-group feed: /events/rss/ — announces newly-posted events (pubDate = post time,
+  # so LOOKBACK_DAYS naturally ignores long-standing events). Direct fetch is HTTP 451 (geo-blocked),
+  # so proxy: true routes via SOCKS5_PROXY. prefilter: false — curated single-topic groups, event titles
+  # may lack video keywords. fetch_content: false — the meetup event page is geo-blocked too; the RSS
+  # <description> already carries the details. openrss.org was tried first but 503s on Meetup right now.
+  # Non-meetup entries on the Demuxed list (Paris, SF, Tokyo/Luma, LinkedIn) have no native RSS — skipped.
+  - name: meetup-auckland-video
+    type: rss
+    url: "https://www.meetup.com/aklvid/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-berlin-video-tech
+    type: rss
+    url: "https://www.meetup.com/Berlin-Video-Tech-Meetup/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-bos-video-tech
+    type: rss
+    url: "https://www.meetup.com/BOS-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-cloud-native-media
+    type: rss
+    url: "https://www.meetup.com/cloud-native-media/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-denver-video-tech
+    type: rss
+    url: "https://www.meetup.com/Denver-Digital-Video/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-fukuoka-video-tech
+    type: rss
+    url: "https://www.meetup.com/fukuoka-video-tech/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-kw-video-tech
+    type: rss
+    url: "https://www.meetup.com/KW-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-london-video-tech
+    type: rss
+    url: "https://www.meetup.com/London-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-la-video-tech
+    type: rss
+    url: "https://www.meetup.com/Los-Angeles-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-melbourne-video-tech
+    type: rss
+    url: "https://www.meetup.com/Melbourne-Video-Technology-Meetup/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-milan-video-tech
+    type: rss
+    url: "https://www.meetup.com/Milan-Video-Tech-Meetup-Group/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-montevideo-tech
+    type: rss
+    url: "https://www.meetup.com/MonteVIDEO-Tech-Meetup/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-norway-video-tech
+    type: rss
+    url: "https://www.meetup.com/Norway-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-stockholm-video-tech
+    type: rss
+    url: "https://www.meetup.com/Stockholm-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-sydney-video-tech
+    type: rss
+    url: "https://www.meetup.com/Sydney-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-nyc-video-tech
+    type: rss
+    url: "https://www.meetup.com/Video-Tech-NYC/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  - name: meetup-tlv-video-tech
+    type: rss
+    url: "https://www.meetup.com/TLV-Video-Technology/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+  # returns HTTP 403 on the RSS feed (2026-07-07); revisit if it starts serving
+  - name: meetup-bcn-video-tech
+    type: rss
+    url: "https://www.meetup.com/BCNVideoTech/events/rss/"
+    proxy: true
+    prefilter: false
+    fetch_content: false
+    enabled: false
+
   # --- Beyond blogs (added 2026-07-07): GitHub/GitLab releases, YouTube, podcasts, aggregators ---
   # All are Atom/RSS endpoints consumed by the same rss fetcher.
 
