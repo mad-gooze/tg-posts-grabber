@@ -2,6 +2,7 @@ import json
 import logging
 import re
 
+import httpx
 from openai import OpenAI
 
 from .config import Config, STYLE_EXAMPLES
@@ -12,25 +13,40 @@ log = logging.getLogger(__name__)
 CLASSIFY_SYSTEM = """\
 You are a content curator for the Russian Telegram channel «Страдания юного видеоинженера» \
 (“Sufferings of a young video engineer”) — a channel for video engineers about video technology.
+The authors are player/streaming engineers; the audience builds video services.
 
 ON-TOPIC (relevant):
-- Video codecs and compression: AV1/AV2, H.264/HEVC/VVC, VP9, licensing/patent-pool news
-- Encoding, transcoding, FFmpeg and video tooling
-- Streaming protocols and delivery: HLS, LL-HLS, DASH, CMAF, MoQ, WebRTC, SRT, RTMP, CDN
-- Video players, playback, DRM
-- Video quality and QoE: VMAF/PSNR/SSIM, per-title encoding, ABR algorithms
-- Human visual perception, display technology, HDR, frame rates
-- Engineering deep dives from streaming platforms (Netflix, YouTube, Twitch, Vimeo, etc.)
-- Significant industry news: standards, alliances, acquisitions, shutdowns in the streaming space
+- Video codecs and compression: AV1/AV2, H.264/HEVC/VVC, VP9, LC-EVC, licensing/patent-pool news
+- Audio codecs and processing (Opus, xHE-AAC, low-bitrate voice codecs, OS audio stacks)
+- Image codecs and compression (JPEG/jpegli, JPEG-XL, WebP, AVIF, placeholders/LQIP)
+- Encoding, transcoding, FFmpeg/GStreamer/OBS and releases of video tools
+- Streaming protocols and delivery: HLS, LL-HLS, DASH, CMAF, MoQ, WebRTC, SRT, RTMP/WHIP, CDN, CMCD
+- Video players and their releases (hls.js, dash.js, shaka-player, ExoPlayer, AVPlayer…), playback on Smart TV/STB
+- Browser/web-platform media: MSE, EME, WebCodecs, WebRTC APIs, WebTransport, browser releases affecting video
+- DRM (Widevine, PlayReady, FairPlay), video security incidents, piracy tech
+- Video quality and QoE: VMAF/PSNR/SSIM, per-title encoding, ABR algorithms, codec/service quality comparisons and research reports
+- Human visual perception research, display technology, HDR, frame rates
+- Engineering deep dives from video platforms, incl. Russian ones (Netflix, YouTube, Twitch, Кинопоиск, VK Видео, RuTube, Ozon, Kinescope…)
+- Conferences, meetups, webinars, podcasts and CFPs ABOUT video engineering (Demuxed, VideoTech, RTC@Scale, IEEE SPS, NAB/IBC…), incl. talk recordings — score by how technical the program is
+- Useful engineering resources: test-clip collections, glossaries, tutorials, awesome-lists, debugging tools
+- AI/ML only when tied to the video pipeline: super-resolution, neural codecs, video generation infra, translation/lipsync of video
+- Significant industry news with an engineering angle: standards, alliances, acquisitions, shutdowns, dev contests
 
 OFF-TOPIC (reject):
 - Marketing fluff, product promos and press releases without technical substance
-- Webinar/conference announcements, job postings, event photo reports
-- Generic cloud/AI/telecom news not specific to video
+- Events/webinars NOT about video technology; event photo reports without content
+- Job postings
+- Generic cloud/AI/telecom/frontend news not specific to video, audio or images
 - Consumer gadget reviews, TV-show/content business news without a technology angle
 
+Score calibration:
+- 9-10: engineering deep dive, major codec/protocol/player/browser news, strong research report
+- 7-8: solid release notes, technical event announcement with a concrete program, good tool/resource
+- 5-6: on-topic but shallow or niche
+- 0-4: marketing, duplicates of common knowledge, off-topic
+
 Respond with STRICT JSON only, no markdown fences:
-{"relevant": true/false, "score": 0-10, "category": "codecs|streaming|players|infrastructure|perception|industry|tools|other", "reason": "one short sentence"}
+{"relevant": true/false, "score": 0-10, "category": "codecs|streaming|players|browser|infrastructure|perception|industry|events|tools|other", "reason": "one short sentence"}
 score = how well this fits the channel (10 = perfect deep-dive material)."""
 
 DRAFT_SYSTEM_TEMPLATE = """\
@@ -40,8 +56,12 @@ DRAFT_SYSTEM_TEMPLATE = """\
 Стиль канала:
 - Русский язык, технические термины — на английском без перевода (bitrate, ABR, LL-HLS и т.п.)
 - Тон: технично, но разговорно; лёгкая ирония и живые формулировки, без канцелярита и маркетинга
-- Первая строка — жирный цепляющий заголовок по сути новости
+- Голос — «мы», от лица авторов канала («мы проверили», «мы наткнулись»)
+- Первая строка — жирный цепляющий заголовок по сути новости; игра слов и каламбуры приветствуются
 - Дальше 1–3 коротких абзаца: что случилось, почему это важно инженеру, интересная деталь или вывод
+- Для release notes и программ мероприятий уместен маркированный список (•) из 2–4 пунктов
+- Хорошо заканчивать коротким вопросом к читателям («Переходим?», «Участвуем?», «Пойдёте?»), но не в каждом посте
+- Живой жаргон канала: «завезли», «раскатили», «под капотом», «жмёт», «пет-проджект»
 - Без хэштегов, без эмодзи-спама (одно уместное эмодзи допустимо)
 
 Примеры реальных постов канала:
@@ -66,14 +86,52 @@ def _parse_json(raw: str) -> dict:
 
 class LLM:
     def __init__(self, cfg: Config):
-        self.client = OpenAI(base_url=cfg.llm_base_url, api_key=cfg.llm_api_key)
+        # endpoints like eliza's /raw/anthropic speak the Anthropic Messages API,
+        # not the OpenAI chat API — pick the dialect from the base URL
+        self.anthropic = "anthropic" in cfg.llm_base_url
+        self.base_url = cfg.llm_base_url.rstrip("/")
+        self.api_key = cfg.llm_api_key
+        if self.anthropic:
+            # internal endpoints (eliza) use a corporate CA absent from certifi's
+            # bundle — trust the system store instead
+            try:
+                import ssl
+
+                import truststore
+
+                verify = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            except ImportError:
+                verify = True
+            self.http = httpx.Client(verify=verify, timeout=120)
+        else:
+            self.client = OpenAI(base_url=cfg.llm_base_url, api_key=cfg.llm_api_key)
         self.model = cfg.llm_model
         examples = "(примеров нет)"
         if STYLE_EXAMPLES.exists():
             examples = STYLE_EXAMPLES.read_text()
         self.draft_system = DRAFT_SYSTEM_TEMPLATE.format(examples=examples)
 
+    def _chat_anthropic(self, system: str, user: str) -> str:
+        resp = self.http.post(
+            f"{self.base_url}/v1/messages",
+            headers={
+                "authorization": f"OAuth {self.api_key}",
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            json={
+                "model": self.model,
+                "max_tokens": 1024,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["content"][0]["text"]
+
     def _chat(self, system: str, user: str) -> dict:
+        if self.anthropic:
+            return _parse_json(self._chat_anthropic(system, user))
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[

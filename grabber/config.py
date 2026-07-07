@@ -21,6 +21,7 @@ class Source:
     type: str  # "rss" | "telegram"
     url: str
     enabled: bool = True
+    prefilter: bool = True  # false = always send to LLM (single-topic feeds like GitHub releases)
 
 
 @dataclass
@@ -33,6 +34,7 @@ class Config:
     relevance_threshold: int
     max_llm_items_per_run: int
     lookback_days: int
+    prefilter_enabled: bool
     sources: list[Source]
 
     @property
@@ -51,14 +53,21 @@ def load_config() -> Config:
         raw = yaml.safe_load(f)
     sources = [Source(**s) for s in raw["sources"]]
 
+    # LLM_API_KEY=file:<path> reads the key from a file (relative to repo root),
+    # so rotating a token kept in e.g. .ELIZA_TOKEN doesn't require editing .env
+    llm_api_key = os.environ.get("LLM_API_KEY", "")
+    if llm_api_key.startswith("file:"):
+        llm_api_key = (ROOT / llm_api_key[5:]).read_text().strip()
+
     return Config(
         llm_base_url=os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1"),
-        llm_api_key=os.environ.get("LLM_API_KEY", ""),
+        llm_api_key=llm_api_key,
         llm_model=os.environ.get("LLM_MODEL", ""),
         tg_bot_token=os.environ.get("TG_BOT_TOKEN", ""),
         tg_chat_id=os.environ.get("TG_CHAT_ID", ""),
         relevance_threshold=int(os.environ.get("RELEVANCE_THRESHOLD", "7")),
         max_llm_items_per_run=int(os.environ.get("MAX_LLM_ITEMS_PER_RUN", "40")),
         lookback_days=int(os.environ.get("LOOKBACK_DAYS", "3")),
+        prefilter_enabled=os.environ.get("PREFILTER", "1") != "0",
         sources=[s for s in sources if s.enabled],
     )

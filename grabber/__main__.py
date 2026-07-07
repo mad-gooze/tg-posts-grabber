@@ -14,6 +14,7 @@ from .fetchers.rss import fetch_rss
 from .fetchers.telegram_web import fetch_telegram
 from .llm import LLM
 from .notify import Notifier
+from .prefilter import match as prefilter_match
 from .state import State
 
 log = logging.getLogger("grabber")
@@ -65,8 +66,13 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
     state = State(STATE_DB)
     cutoff = datetime.now(timezone.utc) - timedelta(days=cfg.lookback_days)
 
+    # telegram channels (hand-curated) and prefilter:false sources (single-topic
+    # feeds like GitHub releases, where titles are just "v4.2.0") bypass the keyword gate
+    prefilter_exempt = {s.name for s in cfg.sources if s.type == "telegram" or not s.prefilter}
+
     all_items = fetch_all(cfg)
     new_items = []
+    filtered = 0
     for item in all_items:
         if state.is_known(item.source, item.item_id):
             continue
@@ -76,7 +82,19 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
         if item.published and item.published < cutoff:
             state.mark(item.source, item.item_id, item.url, "seen")
             continue
+        if (
+            cfg.prefilter_enabled
+            and item.source not in prefilter_exempt
+            and prefilter_match(item.title, item.text) is None
+        ):
+            state.mark(item.source, item.item_id, item.url, "filtered")
+            filtered += 1
+            log.info("filtered (no video keywords) [%s] %s", item.source, item.title[:80])
+            continue
         new_items.append(item)
+
+    if filtered:
+        log.info("prefilter: skipped %d of %d new items without LLM calls", filtered, filtered + len(new_items))
 
     if init_only:
         log.info("init: marked %d items as seen, no LLM calls or sends", len(all_items))
@@ -144,7 +162,7 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
         state.mark(item.source, item.item_id, item.url, "drafted", cls["score"])
         drafted += 1
 
-    log.info("done: %d drafted, %d rejected, %d new total", drafted, rejected, len(new_items))
+    log.info("done: %d drafted, %d rejected, %d prefiltered, %d sent to LLM", drafted, rejected, filtered, len(new_items))
     state.close()
 
 

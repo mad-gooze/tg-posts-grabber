@@ -196,39 +196,51 @@ sources:
   - name: gh-shaka-player
     type: rss
     url: "https://github.com/shaka-project/shaka-player/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-hlsjs
     type: rss
     url: "https://github.com/video-dev/hls.js/releases.atom"   # frequent patch releases; LLM should reject minor ones
+    prefilter: false  # release titles are bare version numbers
   - name: gh-dashjs
     type: rss
     url: "https://github.com/Dash-Industry-Forum/dash.js/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-videojs
     type: rss
     url: "https://github.com/videojs/video.js/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-gpac
     type: rss
     url: "https://github.com/gpac/gpac/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-media3
     type: rss
     url: "https://github.com/androidx/media/releases.atom"     # ExoPlayer/Media3
+    prefilter: false  # release titles are bare version numbers
   - name: gh-srt
     type: rss
     url: "https://github.com/Haivision/srt/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-janus
     type: rss
     url: "https://github.com/meetecho/janus-gateway/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-obs
     type: rss
     url: "https://github.com/obsproject/obs-studio/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-rav1e
     type: rss
     url: "https://github.com/xiph/rav1e/releases.atom"
+    prefilter: false  # release titles are bare version numbers
   - name: gh-vvenc
     type: rss
     url: "https://github.com/fraunhoferhhi/vvenc/releases.atom"  # Fraunhofer VVC encoder
+    prefilter: false  # release titles are bare version numbers
   - name: gl-svt-av1
     type: rss
     url: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/tags?format=atom"
+    prefilter: false  # release titles are bare version numbers
 
   # YouTube channels (Atom feeds with thumbnails → drafts get an image)
   - name: yt-demuxed

@@ -5,6 +5,7 @@ dist/
 .DS_Store
 .venv/
 .env
+.ELIZA_TOKEN
 state.sqlite
 __pycache__/
 .claude/
