@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# One-shot setup for tg-grabber: collect tokens, install deps, seed state,
+# install the cron entry, and do a first run. Safe to re-run (idempotent).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+VENV="$SCRIPT_DIR/.venv"
+PY="$VENV/bin/python"
+CRON_DEFAULT="0 9,13,17,21 * * *"
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+info() { printf '  %s\n' "$1"; }
+warn() { printf '\033[33m  %s\033[0m\n' "$1"; }
+die()  { printf '\033[31mError: %s\033[0m\n' "$1" >&2; exit 1; }
+
+# ask VAR "prompt" ["default"] — plain input; loops until non-empty unless a default is given.
+ask() {
+    local __var=$1 __prompt=$2 __default=${3-} __ans
+    while :; do
+        if [ -n "$__default" ]; then
+            read -r -p "$__prompt [$__default]: " __ans || true
+            __ans=${__ans:-$__default}
+        else
+            read -r -p "$__prompt: " __ans || true
+        fi
+        [ -n "$__ans" ] && break
+        warn "This value is required."
+    done
+    printf -v "$__var" '%s' "$__ans"
+}
+
+# ask_secret VAR "prompt" — hidden input; loops until non-empty.
+ask_secret() {
+    local __var=$1 __prompt=$2 __ans
+    while :; do
+        read -r -s -p "$__prompt: " __ans || true
+        echo
+        [ -n "$__ans" ] && break
+        warn "This value is required."
+    done
+    printf -v "$__var" '%s' "$__ans"
+}
+
+# ask_opt VAR "prompt" — optional; empty enter leaves it unset.
+ask_opt() {
+    local __var=$1 __prompt=$2 __ans
+    read -r -p "$__prompt (optional, enter to skip): " __ans || true
+    printf -v "$__var" '%s' "$__ans"
+}
+
+confirm() {  # confirm "question" -> returns 0 for yes
+    local __ans
+    read -r -p "$1 [y/N]: " __ans || true
+    case "$__ans" in [yY]|[yY][eE][sS]) return 0;; *) return 1;; esac
+}
+
+# ---------------------------------------------------------------------------
+# 1. Preflight
+# ---------------------------------------------------------------------------
+bold "tg-grabber bootstrap"
+[ -f "$SCRIPT_DIR/sources.yaml" ] || die "sources.yaml not found — run this from a tg-grabber clone."
+[ -f "$SCRIPT_DIR/.env.example" ] || die ".env.example not found — run this from a tg-grabber clone."
+
+command -v python3 >/dev/null 2>&1 || die "python3 not found on PATH."
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
+    die "Python 3.11+ required (found $(python3 -V 2>&1))."
+fi
+info "Python: $(python3 -V 2>&1)"
+
+# ---------------------------------------------------------------------------
+# 2. Venv + deps
+# ---------------------------------------------------------------------------
+bold "Installing dependencies"
+if [ ! -x "$PY" ]; then
+    info "Creating venv at .venv"
+    python3 -m venv "$VENV"
+else
+    info "Reusing existing .venv"
+fi
+"$PY" -m pip install --quiet --upgrade pip
+"$PY" -m pip install --quiet \
+    feedparser "httpx[socks]" beautifulsoup4 openai python-dotenv pyyaml truststore
+info "Dependencies installed."
+
+# ---------------------------------------------------------------------------
+# 3. Collect config
+# ---------------------------------------------------------------------------
+bold "Configuration"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    warn ".env already exists."
+    if confirm "Overwrite it? (a backup .env.bak will be saved)"; then
+        cp "$SCRIPT_DIR/.env" "$SCRIPT_DIR/.env.bak"
+        info "Backed up existing .env to .env.bak"
+    else
+        die "Keeping existing .env — edit it by hand, or move it aside and re-run."
+    fi
+fi
+
+echo
+info "LLM endpoint (OpenAI-compatible, or Anthropic Messages API if URL contains 'anthropic')"
+ask        LLM_BASE_URL "  LLM_BASE_URL" "https://api.openai.com/v1"
+ask_secret LLM_API_KEY  "  LLM_API_KEY (hidden)"
+ask        LLM_MODEL    "  LLM_MODEL" "gpt-4o-mini"
+
+echo
+info "Telegram bot (create via @BotFather; see README §2)"
+ask_secret TG_BOT_TOKEN "  TG_BOT_TOKEN (hidden)"
+info "  Need your chat id? Message the bot, then: .venv/bin/python -m grabber --whoami"
+ask        TG_CHAT_ID   "  TG_CHAT_ID"
+
+echo
+info "Optional content-source tokens (only needed for slack/discord sources)"
+ask_opt SLACK_TOKEN   "  SLACK_TOKEN"
+ask_opt DISCORD_TOKEN "  DISCORD_TOKEN"
+
+echo
+info "Optional SOCKS5 proxy for blocked sources (e.g. socks5h://user:pass@host:port)"
+ask_opt SOCKS5_PROXY "  SOCKS5_PROXY"
+
+echo
+info "Optional pipeline tuning (enter to accept in-code defaults)"
+ask_opt RELEVANCE_THRESHOLD   "  RELEVANCE_THRESHOLD (default 7)"
+ask_opt MAX_LLM_ITEMS_PER_RUN "  MAX_LLM_ITEMS_PER_RUN (default 40)"
+ask_opt LOOKBACK_DAYS         "  LOOKBACK_DAYS (default 3)"
+ask_opt CLASSIFY_MODEL        "  CLASSIFY_MODEL (default = LLM_MODEL)"
+ask_opt CLASSIFY_BATCH_SIZE   "  CLASSIFY_BATCH_SIZE (default 8)"
+
+# ---------------------------------------------------------------------------
+# 4. Write .env
+# ---------------------------------------------------------------------------
+bold "Writing .env"
+ENV_FILE="$SCRIPT_DIR/.env"
+{
+    echo "# Generated by bootstrap.sh — edit freely; see .env.example for docs."
+    echo
+    echo "LLM_BASE_URL=$LLM_BASE_URL"
+    echo "LLM_API_KEY=$LLM_API_KEY"
+    echo "LLM_MODEL=$LLM_MODEL"
+    echo
+    echo "TG_BOT_TOKEN=$TG_BOT_TOKEN"
+    echo "TG_CHAT_ID=$TG_CHAT_ID"
+    # Optional values are written only when provided, so unset ones fall back to defaults.
+    [ -n "$SLACK_TOKEN" ]           && { echo; echo "SLACK_TOKEN=$SLACK_TOKEN"; }
+    [ -n "$DISCORD_TOKEN" ]         && echo "DISCORD_TOKEN=$DISCORD_TOKEN"
+    [ -n "$SOCKS5_PROXY" ]          && { echo; echo "SOCKS5_PROXY=$SOCKS5_PROXY"; }
+    [ -n "$RELEVANCE_THRESHOLD" ]   && { echo; echo "RELEVANCE_THRESHOLD=$RELEVANCE_THRESHOLD"; }
+    [ -n "$MAX_LLM_ITEMS_PER_RUN" ] && echo "MAX_LLM_ITEMS_PER_RUN=$MAX_LLM_ITEMS_PER_RUN"
+    [ -n "$LOOKBACK_DAYS" ]         && echo "LOOKBACK_DAYS=$LOOKBACK_DAYS"
+    [ -n "$CLASSIFY_MODEL" ]        && echo "CLASSIFY_MODEL=$CLASSIFY_MODEL"
+    [ -n "$CLASSIFY_BATCH_SIZE" ]   && echo "CLASSIFY_BATCH_SIZE=$CLASSIFY_BATCH_SIZE"
+} > "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+info "Wrote $ENV_FILE (mode 600)."
+
+# ---------------------------------------------------------------------------
+# 5. Seed state (avoid first-run flood)
+# ---------------------------------------------------------------------------
+bold "Seeding state (marking current feed items as seen)"
+"$PY" -m grabber --init
+info "Done — existing items won't be sent as drafts."
+
+# ---------------------------------------------------------------------------
+# 6. Install crontab entry (idempotent)
+# ---------------------------------------------------------------------------
+bold "Cron schedule"
+info "Default runs 4×/day. Press enter to accept, or type a custom cron expression."
+ask CRON_SCHEDULE "  Schedule" "$CRON_DEFAULT"
+
+CRON_LINE="$CRON_SCHEDULE cd $SCRIPT_DIR && $VENV/bin/python -m grabber >> $SCRIPT_DIR/grabber.log 2>&1"
+
+command -v crontab >/dev/null 2>&1 || die "crontab command not found."
+# No crontab yet exits non-zero; treat that as an empty list rather than an error.
+EXISTING="$(crontab -l 2>/dev/null || true)"
+
+# Drop any prior tg-grabber line, keep everything else, append the fresh one.
+NEW_CRON="$(printf '%s\n' "$EXISTING" | grep -v -- '-m grabber' | sed '/^$/d' || true)"
+if [ -n "$NEW_CRON" ]; then
+    NEW_CRON="$NEW_CRON"$'\n'"$CRON_LINE"
+else
+    NEW_CRON="$CRON_LINE"
+fi
+
+if printf '%s\n' "$NEW_CRON" | crontab -; then
+    info "Installed cron entry:"
+    info "  $CRON_LINE"
+else
+    warn "Could not install crontab automatically (on macOS your terminal may need"
+    warn "Full Disk Access). Add this line manually with 'crontab -e':"
+    warn "  $CRON_LINE"
+fi
+
+# ---------------------------------------------------------------------------
+# 7. First run
+# ---------------------------------------------------------------------------
+bold "First run (dry-run — drafts printed below, nothing sent)"
+"$PY" -m grabber --dry-run
+
+echo
+if confirm "Send these drafts to Telegram for real now?"; then
+    bold "Real run"
+    "$PY" -m grabber
+    info "Sent. Check your Telegram."
+else
+    info "Skipped. Cron will produce the first real drafts at the next scheduled slot."
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Summary
+# ---------------------------------------------------------------------------
+echo
+bold "All set."
+info "Config:  $ENV_FILE"
+info "Cron:    $CRON_LINE"
+info "Logs:    $SCRIPT_DIR/grabber.log"
+info "Manual:  $VENV/bin/python -m grabber [--dry-run|--init|--whoami]"

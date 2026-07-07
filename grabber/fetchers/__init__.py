@@ -11,6 +11,9 @@ class Item:
     text: str
     published: datetime | None = None
     image_url: str | None = None
+    # cross-source dedup key, filled by the pipeline after prefilter (see grabber/dedup.py)
+    norm_url: str = ""
+    simhash: int = 0
 
 
 # Submodules do `from . import Item`, so these imports must come after the dataclass.

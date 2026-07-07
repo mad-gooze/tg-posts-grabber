@@ -65,6 +65,18 @@ fences — exactly one object per item, in input order:
 [{{"id": 1, "relevant": true/false, "score": 0-10, "category": "{_CATEGORIES}", "reason": "one short sentence"}}, ...]
 score = how well each item fits the channel (10 = perfect deep-dive material)."""
 
+CLUSTER_SYSTEM = """\
+You are grouping news items that a video-engineering channel is about to post.
+Group together ONLY items that report the SAME underlying story, event, or release —
+near-duplicates, including the same story told by different sources or in different \
+languages (e.g. a Russian and an English write-up of the same codec release). Items about \
+different stories must stay in separate groups, even if they share a topic.
+
+You are given numbered items (ids 1..N). Respond with a STRICT JSON array only, no markdown \
+fences — one object per group, each listing the member ids:
+[{"members": [1, 3]}, {"members": [2]}]
+Every id from 1 to N must appear exactly once. Never invent ids that were not given."""
+
 DRAFT_SYSTEM_TEMPLATE = """\
 Ты — автор русскоязычного Telegram-канала «Страдания юного видеоинженера» о видеотехнологиях: \
 кодеки, стриминговые протоколы, плееры, качество видео, восприятие, инженерные истории индустрии.
@@ -263,6 +275,54 @@ class LLM:
                 log.warning("classify failed for %s: %s", item.url, e)
                 results.append(None)
         return results
+
+    def cluster(self, items: list[Item]) -> list[list[int]]:
+        """Group items reporting the same story into clusters of 0-based indices.
+
+        Catches semantic near-dups the lexical pass misses (e.g. RU vs EN of one story).
+        Only ever merges, never rejects — on any failure every item becomes its own
+        singleton so the caller falls back to the lexical grouping unchanged."""
+        n = len(items)
+        singletons = [[i] for i in range(n)]
+        if n < 2:
+            return singletons
+        user = "\n\n".join(
+            f"### Item {i}\nSource: {item.source}\nTitle: {item.title}\n\n{item.text[:200]}"
+            for i, item in enumerate(items, 1)
+        )
+        try:
+            raw = self._chat_raw(
+                CLUSTER_SYSTEM,
+                user,
+                "cluster",
+                self.classify_model,
+                max_tokens=max(512, 64 * n),
+                disable_thinking=True,
+            )
+            groups: list[list[int]] = []
+            seen: set[int] = set()
+            for entry in _parse_json_array(raw):
+                if not isinstance(entry, dict):
+                    continue
+                idxs = []
+                for m in entry.get("members", []):
+                    try:
+                        i = int(m) - 1  # prompt is 1-based; return 0-based
+                    except (TypeError, ValueError):
+                        continue
+                    if 0 <= i < n and i not in seen:
+                        seen.add(i)
+                        idxs.append(i)
+                if idxs:
+                    groups.append(idxs)
+            # any id the model dropped becomes its own singleton
+            for i in range(n):
+                if i not in seen:
+                    groups.append([i])
+            return groups
+        except Exception as e:
+            log.warning("cluster of %d items failed (%s), keeping lexical groups", n, e)
+            return singletons
 
     def draft(self, item: Item, category: str) -> dict:
         user = (

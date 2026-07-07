@@ -5,11 +5,13 @@ import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
 from .config import Config, Source, STATE_DB, USER_AGENT, load_config
+from .dedup import content_key, hamming_close, normalize_url
 from .fetchers import FETCHERS, PREFILTER_EXEMPT_TYPES, Item
 from .llm import LLM
 from .notify import Notifier
@@ -17,6 +19,53 @@ from .prefilter import match as prefilter_match
 from .state import State
 
 log = logging.getLogger("grabber")
+
+# most sources link is what drives Telegram's web preview, so keep the list short
+MAX_SOURCE_LINKS = 6
+
+
+@dataclass
+class Group:
+    """A set of items judged to be the same story. Drafted once; every member is marked
+    in state so none re-processes next run."""
+
+    members: list[Item]
+    representative: Item
+    classification: dict | None = None
+
+
+def _pick_representative(members: list[Item], by_score: bool) -> Item:
+    """Pre-classify (by_score=False): longest text, tie-break earliest published — a proxy
+    for the most substantial write-up. Post-merge (by_score=True): handled by the caller
+    from group scores, so this branch just falls back to the same heuristic."""
+    epoch = datetime.min.replace(tzinfo=timezone.utc)
+    return min(members, key=lambda m: (-len(m.text), m.published or epoch))
+
+
+def _group_lexically(items: list[Item]) -> list[Group]:
+    """Union-find grouping by exact normalized URL or near-duplicate simhash."""
+    parent = list(range(len(items)))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int):
+        parent[find(a)] = find(b)
+
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a, b = items[i], items[j]
+            same_url = bool(a.norm_url) and a.norm_url == b.norm_url
+            if same_url or hamming_close(a.simhash, b.simhash):
+                union(i, j)
+
+    buckets: dict[int, list[Item]] = {}
+    for i, item in enumerate(items):
+        buckets.setdefault(find(i), []).append(item)
+    return [Group(members=m, representative=_pick_representative(m, by_score=False)) for m in buckets.values()]
 
 
 @contextmanager
@@ -96,18 +145,102 @@ def og_image(url: str, proxy: str | None = None) -> str | None:
         return None
 
 
-def format_message(draft: dict, item: Item, classification: dict) -> str:
-    return (
-        f"📝 <b>{html.escape(draft['title'])}</b>\n\n"
-        f"{draft['text']}\n\n"
-        f"🔗 <a href=\"{html.escape(item.url)}\">{html.escape(item.url)}</a>\n"
-        f"#{classification['category']} · score {classification['score']} · {item.source}"
-    )
+def format_message(draft: dict, group: Group, classification: dict) -> str:
+    rep = group.representative
+    header = f"📝 <b>{html.escape(draft['title'])}</b>\n\n{draft['text']}\n\n"
+    tag = f"#{classification['category']} · score {classification['score']}"
+
+    if len(group.members) == 1:
+        link = f"🔗 <a href=\"{html.escape(rep.url)}\">{html.escape(rep.url)}</a>\n" if rep.url else ""
+        return header + link + f"{tag} · {html.escape(rep.source)}"
+
+    # multi-source: one link per distinct source URL, representative first so the web
+    # preview uses it; de-dup by normalized URL (two members can share a link)
+    ordered = [rep] + [m for m in group.members if m is not rep]
+    seen: set[str] = set()
+    links: list[str] = []
+    for m in ordered:
+        if not m.url:
+            continue
+        key = normalize_url(m.url) or m.url
+        if key in seen:
+            continue
+        seen.add(key)
+        links.append(f"• <a href=\"{html.escape(m.url)}\">{html.escape(m.source)}</a>")
+
+    n_sources = len(links)
+    extra = ""
+    if len(links) > MAX_SOURCE_LINKS:
+        extra = f"\n• +{len(links) - MAX_SOURCE_LINKS} ещё"
+        links = links[:MAX_SOURCE_LINKS]
+    sources_block = "🔗 Источники:\n" + "\n".join(links) + extra + "\n"
+    return header + sources_block + f"{tag} · {n_sources} sources"
+
+
+def _mark_group(state: State, group: Group, status: str, score: int | None = None):
+    """Persist every member (not just the representative) so is_known suppresses the whole
+    story next run, and store each member's content-key so later cross-run reshares dedup."""
+    rep = group.representative
+    ref = f"{rep.source}/{rep.item_id}"
+    for m in group.members:
+        state.mark(
+            m.source, m.item_id, m.url, status, score,
+            norm_url=m.norm_url, simhash=m.simhash,
+            primary_ref=None if m is rep else ref,
+        )
+
+
+def _suppress_cross_run(state: State, items: list[Item], cutoff_iso: str) -> list[Item]:
+    """Drop items whose content already appeared (drafted or rejected) in a recent run,
+    marking them 'duplicate'. This is deterministic and spends no LLM calls."""
+    known = state.recent_content_keys(cutoff_iso)
+    url_map = {row[4]: (row[0], row[1]) for row in known if row[4]}  # norm_url -> (source, item_id)
+    sim_rows = [(row[5], row[0], row[1]) for row in known if row[5]]  # (simhash, source, item_id)
+
+    survivors: list[Item] = []
+    for item in items:
+        primary = None
+        if item.norm_url and item.norm_url in url_map:
+            primary = url_map[item.norm_url]
+        elif item.simhash:
+            for sh, src, iid in sim_rows:
+                if hamming_close(item.simhash, sh):
+                    primary = (src, iid)
+                    break
+        if primary is None:
+            survivors.append(item)
+            continue
+        state.mark(
+            item.source, item.item_id, item.url, "duplicate",
+            norm_url=item.norm_url, simhash=item.simhash,
+            primary_ref=f"{primary[0]}/{primary[1]}",
+        )
+        log.info("cross-run dup of %s/%s [%s] %s", primary[0], primary[1], item.source, item.title[:60])
+    return survivors
+
+
+def _merge_clusters(llm: LLM, groups: list[Group]) -> list[Group]:
+    """Ask the LLM to merge groups reporting the same story. Only merges, never rejects —
+    on failure the lexical groups pass through unchanged. Merged group keeps the highest-
+    scoring member's classification and representative."""
+    if len(groups) < 2:
+        return groups
+    clusters = llm.cluster([g.representative for g in groups])
+    merged: list[Group] = []
+    for idxs in clusters:
+        chosen = [groups[i] for i in idxs]
+        primary = max(chosen, key=lambda g: (g.classification["score"], len(g.representative.text)))
+        members = [m for g in chosen for m in g.members]
+        merged.append(Group(members=members, representative=primary.representative,
+                            classification=primary.classification))
+    return merged
 
 
 def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
     state = State(STATE_DB)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=cfg.lookback_days)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=cfg.lookback_days)
+    cutoff_iso = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
     # hand-curated chat sources (telegram/slack/discord) and prefilter:false sources
     # (single-topic feeds like GitHub releases, titles just "v4.2.0") bypass the keyword gate
@@ -147,21 +280,37 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
         state.close()
         return
 
-    new_items.sort(key=lambda i: i.published or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-    cap = limit if limit is not None else cfg.max_llm_items_per_run
-    if len(new_items) > cap:
-        log.info("capping LLM processing to %d of %d new items (rest stay unseen for next run)", cap, len(new_items))
-        new_items = new_items[:cap]
+    # content keys drive both cross-run suppression and within-run grouping
+    for item in new_items:
+        item.norm_url, item.simhash = content_key(item)
 
-    if not new_items:
-        log.info("no new items")
+    survivors = _suppress_cross_run(state, new_items, cutoff_iso)
+    cross_run_dups = len(new_items) - len(survivors)
+
+    groups = _group_lexically(survivors)
+    groups.sort(
+        key=lambda g: g.representative.published or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    lexical_groups = len(groups)
+
+    cap = limit if limit is not None else cfg.max_llm_items_per_run
+    if len(groups) > cap:
+        log.info("capping LLM processing to %d of %d groups (rest stay unseen for next run)", cap, len(groups))
+        groups = groups[:cap]
+
+    if not groups:
+        log.info("no new items (%d cross-run dups)", cross_run_dups)
+        state.prune((now - timedelta(days=2 * cfg.lookback_days)).strftime("%Y-%m-%d %H:%M:%S"))
         state.close()
         return
 
     if not cfg.llm_configured:
-        log.warning("LLM not configured (LLM_API_KEY/LLM_MODEL) — listing %d new items, not marking them", len(new_items))
-        for item in new_items:
-            print(f"[{item.source}] {item.title} — {item.url}")
+        log.warning("LLM not configured (LLM_API_KEY/LLM_MODEL) — listing %d groups, not marking them", len(groups))
+        for g in groups:
+            r = g.representative
+            extra = f" (+{len(g.members) - 1} sources)" if len(g.members) > 1 else ""
+            print(f"[{r.source}] {r.title} — {r.url}{extra}")
         state.close()
         return
 
@@ -174,46 +323,63 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
             sys.exit(1)
         notifier = Notifier(cfg.tg_bot_token, cfg.tg_chat_id)
 
-    drafted = rejected = 0
+    # classify phase: one call per group representative
+    rejected = 0
+    relevant: list[Group] = []
     batch_size = max(1, cfg.classify_batch_size)
-    for start in range(0, len(new_items), batch_size):
-        batch = new_items[start : start + batch_size]
-        for item, cls in zip(batch, llm.classify_batch(batch)):
+    reps = [g.representative for g in groups]
+    for start in range(0, len(groups), batch_size):
+        batch_groups = groups[start : start + batch_size]
+        for group, cls in zip(batch_groups, llm.classify_batch(reps[start : start + batch_size])):
             if cls is None:
-                # classify failed even per-item (already logged); item stays unmarked for the next run
+                # classify failed even per-item (already logged); group stays unmarked for next run
                 continue
-
             if not cls["relevant"] or cls["score"] < cfg.relevance_threshold:
-                state.mark(item.source, item.item_id, item.url, "rejected", cls["score"])
+                _mark_group(state, group, "rejected", cls["score"])
                 rejected += 1
-                log.info("rejected (%d/10) [%s] %s — %s", cls["score"], item.source, item.title[:60], cls["reason"])
+                log.info("rejected (%d/10) [%s] %s — %s", cls["score"], group.representative.source,
+                         group.representative.title[:60], cls["reason"])
                 continue
+            group.classification = cls
+            relevant.append(group)
 
+    # semantic merge of same-story groups the lexical pass missed
+    final = _merge_clusters(llm, relevant)
+    llm_merged = len(relevant) - len(final)
+
+    # draft + send phase: one draft per final group
+    drafted = 0
+    for group in final:
+        rep, cls = group.representative, group.classification
+        try:
+            draft = llm.draft(rep, cls["category"])
+        except Exception as e:
+            log.warning("draft failed for %s (%s), leaving for next run", rep.url, e)
+            continue
+
+        # article pages of blocked sources are blocked too — look up og:image via proxy
+        image = rep.image_url
+        if not image and rep.url:
+            image = og_image(rep.url, cfg.socks5_proxy if rep.source in proxied_sources else None)
+        message = format_message(draft, group, cls)
+
+        if dry_run:
+            print(f"\n{'=' * 70}\nIMAGE: {image}\n{message}")
+        else:
             try:
-                draft = llm.draft(item, cls["category"])
+                notifier.send_draft(message, image)
             except Exception as e:
-                log.warning("draft failed for %s (%s), leaving for next run", item.url, e)
+                log.error("send failed for %s (%s), leaving for next run", rep.url, e)
                 continue
+        _mark_group(state, group, "drafted", cls["score"])
+        drafted += 1
 
-            # article pages of blocked sources are blocked too — look up og:image via proxy
-            image = item.image_url or og_image(
-                item.url, cfg.socks5_proxy if item.source in proxied_sources else None
-            )
-            message = format_message(draft, item, cls)
-
-            if dry_run:
-                print(f"\n{'=' * 70}\nIMAGE: {image}\n{message}")
-            else:
-                try:
-                    notifier.send_draft(message, image)
-                except Exception as e:
-                    log.error("send failed for %s (%s), leaving for next run", item.url, e)
-                    continue
-            state.mark(item.source, item.item_id, item.url, "drafted", cls["score"])
-            drafted += 1
-
-    log.info("done: %d drafted, %d rejected, %d prefiltered, %d sent to LLM", drafted, rejected, filtered, len(new_items))
+    log.info(
+        "done: %d drafted, %d rejected, %d cross-run dups, %d lexical groups, %d llm-merged",
+        drafted, rejected, cross_run_dups, lexical_groups, llm_merged,
+    )
     log.info("tokens: %s", llm.usage_summary())
+    state.prune((now - timedelta(days=2 * cfg.lookback_days)).strftime("%Y-%m-%d %H:%M:%S"))
     state.close()
 
 
