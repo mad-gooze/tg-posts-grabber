@@ -10,6 +10,11 @@ Slack, Discord, Hacker News, Bluesky (`sources.yaml`; see
 an LLM (relevance to video engineering) → drafts posts in the channel's style (few-shot from
 `style_examples.md`) → sends drafts (title, text, source URL, image) to you via a Telegram bot.
 
+Before classifying, the grabber opens each candidate article and extracts its full readable
+text with [trafilatura](https://trafilatura.readthedocs.io/) (`grabber/content.py`), so the LLM
+scores and writes from the real page rather than a one-line feed teaser. Fetched pages are cached
+in `state.sqlite`; set `FETCH_FULL_CONTENT=0` to fall back to feed snippets only.
+
 ## Quick start
 
 ```bash
@@ -25,7 +30,7 @@ same thing by hand.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install feedparser httpx beautifulsoup4 openai python-dotenv pyyaml truststore
+.venv/bin/pip install feedparser httpx beautifulsoup4 trafilatura openai python-dotenv pyyaml truststore
 cp .env.example .env   # then fill it in
 ```
 
@@ -68,6 +73,11 @@ rotating token can live in its own gitignored file.
 - `RELEVANCE_THRESHOLD` (default 7): raise for fewer/better drafts, lower for more.
 - `MAX_LLM_ITEMS_PER_RUN` (default 40): caps LLM spend per run; overflow items are picked up next run.
 - `LOOKBACK_DAYS` (default 3): items older than this are marked seen without processing.
+- `FETCH_FULL_CONTENT=0`: disable full-page fetching, feeding the LLM the feed snippet only.
+  Enabled by default; the grabber fetches at most `MAX_LLM_ITEMS_PER_RUN` article pages per run
+  (only the survivors about to hit the LLM) and caches them in `state.sqlite`. Chat sources
+  (telegram/slack/discord) are skipped since their URL is the post itself; any source can opt out
+  with `fetch_content: false` in `sources.yaml`.
 - `PREFILTER=0`: disable the keyword whitelist gate. By default RSS items with no
   video/audio/streaming keyword in title+text are marked `filtered` without an LLM call
   (the keyword list in `grabber/prefilter.py` is deliberately wide — false positives just

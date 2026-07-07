@@ -11,6 +11,9 @@ class Item:
     text: str
     published: datetime | None = None
     image_url: str | None = None
+    # full article text (markdown), fetched lazily by the pipeline for items about to hit
+    # the LLM; empty when fetching is disabled/failed. Downstream prefers it over `text`.
+    content: str = ""
     # cross-source dedup key, filled by the pipeline after prefilter (see grabber/dedup.py)
     norm_url: str = ""
     simhash: int = 0

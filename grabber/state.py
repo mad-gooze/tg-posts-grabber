@@ -13,6 +13,13 @@ CREATE TABLE IF NOT EXISTS items (
     ts       TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (source, item_id)
 );
+-- extracted full-page article text, keyed by normalized URL so items sharing a URL reuse
+-- one fetch and a failed-then-retried draft doesn't re-fetch next run
+CREATE TABLE IF NOT EXISTS content (
+    norm_url TEXT PRIMARY KEY,
+    content  TEXT NOT NULL,
+    ts       TEXT DEFAULT (datetime('now'))
+);
 """
 
 # columns added after the original release; ADD COLUMN isn't idempotent so we guard on PRAGMA
@@ -41,7 +48,7 @@ def _to_unsigned(s: int | None) -> int:
 class State:
     def __init__(self, db_path: Path):
         self.conn = sqlite3.connect(db_path)
-        self.conn.execute(SCHEMA)
+        self.conn.executescript(SCHEMA)  # SCHEMA holds multiple statements
         self._migrate()
         self.conn.commit()
 
@@ -93,11 +100,33 @@ class State:
         # hand back unsigned simhashes so callers can hamming() them directly
         return [(s, i, u, st, nu, _to_unsigned(sh)) for (s, i, u, st, nu, sh) in rows]
 
+    def get_content(self, norm_url: str) -> str | None:
+        """Cached extracted article text for `norm_url`, or None if not fetched yet."""
+        if not norm_url:
+            return None
+        row = self.conn.execute(
+            "SELECT content FROM content WHERE norm_url = ?", (norm_url,)
+        ).fetchone()
+        return row[0] if row else None
+
+    def set_content(self, norm_url: str, content: str):
+        """Cache extracted article text keyed by normalized URL (no-op without a key)."""
+        if not norm_url or not content:
+            return
+        self.conn.execute(
+            "INSERT INTO content (norm_url, content) VALUES (?, ?) "
+            "ON CONFLICT (norm_url) DO UPDATE SET content = excluded.content, ts = datetime('now')",
+            (norm_url, content),
+        )
+        self.conn.commit()
+
     def prune(self, cutoff: str):
         """Drop rows older than `cutoff` to bound the in-memory dedup scan. Callers pass a
         conservative cutoff (older than the fetch lookback) so is_known still suppresses
-        old-but-still-listed feed entries."""
+        old-but-still-listed feed entries. Stale cached article text is dropped on the same
+        cutoff."""
         self.conn.execute("DELETE FROM items WHERE ts < ?", (cutoff,))
+        self.conn.execute("DELETE FROM content WHERE ts < ?", (cutoff,))
         self.conn.commit()
 
     def close(self):

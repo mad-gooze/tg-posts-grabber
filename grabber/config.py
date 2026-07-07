@@ -28,10 +28,15 @@ class Source:
     token_env: str | None = None  # env var holding the auth token; defaults per type (see DEFAULT_TOKEN_ENV)
     token: str = ""  # resolved at load time from token_env; never set in sources.yaml
     proxy: bool = False  # fetch via SOCKS5_PROXY (source blocked on the local network)
+    fetch_content: bool = True  # open the article URL and feed the LLM its full text (see CONTENT_FETCH_SKIP_TYPES)
 
 
 # source types that require an auth token, mapped to the default env var it lives in
 DEFAULT_TOKEN_ENV = {"slack": "SLACK_TOKEN", "discord": "DISCORD_TOKEN"}
+
+# chat sources whose `url` is the post itself, not an external article — no page to fetch,
+# so full-content enrichment skips them regardless of their fetch_content flag
+CONTENT_FETCH_SKIP_TYPES = {"telegram", "slack", "discord"}
 
 
 def _resolve_secret(value: str) -> str:
@@ -55,6 +60,7 @@ class Config:
     max_llm_items_per_run: int
     lookback_days: int
     prefilter_enabled: bool
+    fetch_full_content: bool  # master switch for opening article pages before classify
     socks5_proxy: str  # socks5h://user:pass@host:port; "" = no proxy available
     sources: list[Source]
 
@@ -101,6 +107,7 @@ def load_config() -> Config:
         max_llm_items_per_run=int(os.environ.get("MAX_LLM_ITEMS_PER_RUN", "40")),
         lookback_days=int(os.environ.get("LOOKBACK_DAYS", "3")),
         prefilter_enabled=os.environ.get("PREFILTER", "1") != "0",
+        fetch_full_content=os.environ.get("FETCH_FULL_CONTENT", "1") != "0",
         socks5_proxy=_resolve_secret(os.environ.get("SOCKS5_PROXY", "")),
         sources=enabled_sources,
     )

@@ -7,6 +7,7 @@ dependencies = [
     "feedparser>=6.0",
     "httpx[socks]>=0.27",
     "beautifulsoup4>=4.12",
+    "trafilatura>=1.12",
     "openai>=1.40",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",

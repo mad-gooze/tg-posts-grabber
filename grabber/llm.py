@@ -124,6 +124,12 @@ def _parse_json_array(raw: str) -> list:
     return data
 
 
+def _material(item: Item, cap: int) -> str:
+    """Text handed to the LLM: the fetched full-page content when available (it's richer than
+    the feed teaser), otherwise the feed snippet, sliced to `cap` chars to bound tokens."""
+    return (item.content or item.text)[:cap]
+
+
 def _normalize_cls(result: dict) -> dict:
     return {
         "relevant": bool(result.get("relevant")),
@@ -241,7 +247,7 @@ class LLM:
         return resp.choices[0].message.content
 
     def classify(self, item: Item) -> dict:
-        user = f"Source: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{item.text[:2000]}"
+        user = f"Source: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{_material(item, 3000)}"
         raw = self._chat_raw(CLASSIFY_SYSTEM, user, "classify", self.classify_model, disable_thinking=True)
         return _normalize_cls(_parse_json(raw))
 
@@ -251,7 +257,7 @@ class LLM:
         if the batch response doesn't parse; None marks items that failed both ways."""
         if len(items) > 1:
             user = "\n\n".join(
-                f"### Item {i}\nSource: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{item.text[:1200]}"
+                f"### Item {i}\nSource: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{_material(item, 2000)}"
                 for i, item in enumerate(items, 1)
             )
             try:
@@ -327,7 +333,7 @@ class LLM:
     def draft(self, item: Item, category: str) -> dict:
         user = (
             f"Категория: {category}\nИсточник: {item.source}\nЗаголовок: {item.title}\n"
-            f"URL: {item.url}\n\nМатериал:\n{item.text[:2500]}"
+            f"URL: {item.url}\n\nМатериал:\n{_material(item, 6000)}"
         )
         raw = self._chat_raw(self.draft_system, user, "draft", self.model, cache_system=True)
         result = _parse_json(raw)

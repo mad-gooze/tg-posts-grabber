@@ -81,7 +81,7 @@ else
 fi
 "$PY" -m pip install --quiet --upgrade pip
 "$PY" -m pip install --quiet \
-    feedparser "httpx[socks]" beautifulsoup4 openai python-dotenv pyyaml truststore
+    feedparser "httpx[socks]" beautifulsoup4 trafilatura openai python-dotenv pyyaml truststore
 info "Dependencies installed."
 
 # ---------------------------------------------------------------------------

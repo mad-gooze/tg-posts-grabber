@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from .config import Config, Source, STATE_DB, USER_AGENT, load_config
+from .config import CONTENT_FETCH_SKIP_TYPES, Config, Source, STATE_DB, USER_AGENT, load_config
+from .content import fetch_content
 from .dedup import content_key, hamming_close, normalize_url
 from .fetchers import FETCHERS, PREFILTER_EXEMPT_TYPES, Item
 from .llm import LLM
@@ -236,6 +237,61 @@ def _merge_clusters(llm: LLM, groups: list[Group]) -> list[Group]:
     return merged
 
 
+def enrich_groups(cfg: Config, groups: list[Group], state: State, proxied_sources: set[str]) -> None:
+    """Fetch each eligible group representative's full article page and store the extracted
+    text on rep.content, so classify + draft work from the real page, not the feed teaser.
+
+    Only representatives are fetched (one page per story) and only for groups that survived
+    to the LLM stage, so at most len(groups) <= MAX_LLM_ITEMS_PER_RUN pages are opened.
+    Best-effort: cache hits are reused, failures leave rep.content empty and the LLM falls
+    back to rep.text."""
+    if not cfg.fetch_full_content:
+        return
+    src_by_name = {s.name: s for s in cfg.sources}
+
+    todo: list[Item] = []  # reps that need a live fetch (cache miss)
+    cached = 0
+    for g in groups:
+        rep = g.representative
+        src = src_by_name.get(rep.source)
+        if src is None or not src.fetch_content or src.type in CONTENT_FETCH_SKIP_TYPES:
+            continue
+        if not rep.url.lower().startswith(("http://", "https://")):
+            continue
+        hit = state.get_content(rep.norm_url)
+        if hit:
+            rep.content = hit
+            cached += 1
+        else:
+            todo.append(rep)
+
+    fetched = 0
+    if todo:
+        with httpx.Client(timeout=20) as direct, _proxied_client(cfg) as proxied:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                futures = {}
+                for rep in todo:
+                    use_proxy = rep.source in proxied_sources and proxied is not None
+                    futures[pool.submit(fetch_content, rep.url, proxied if use_proxy else direct)] = rep
+                for future in as_completed(futures):
+                    rep = futures[future]
+                    try:
+                        md = future.result()
+                    except Exception as e:  # fetch_content swallows its own errors; belt and suspenders
+                        log.info("content enrich failed for %s (%s)", rep.url, e)
+                        md = None
+                    if md:
+                        rep.content = md
+                        state.set_content(rep.norm_url, md)
+                        fetched += 1
+
+    if cached or todo:
+        log.info(
+            "content: enriched %d of %d groups (%d fetched, %d cached, %d failed)",
+            cached + fetched, len(groups), fetched, cached, len(todo) - fetched,
+        )
+
+
 def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
     state = State(STATE_DB)
     now = datetime.now(timezone.utc)
@@ -322,6 +378,10 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
             state.close()
             sys.exit(1)
         notifier = Notifier(cfg.tg_bot_token, cfg.tg_chat_id)
+
+    # open the article page of each surviving representative so classify + draft see the
+    # full text, not just the feed snippet (bounded to <= cap, cached in state.sqlite)
+    enrich_groups(cfg, groups, state, proxied_sources)
 
     # classify phase: one call per group representative
     rejected = 0
