@@ -19,9 +19,6 @@ sources:
   - name: dailymotion
     type: rss
     url: "https://medium.com/feed/dailymotion"
-  - name: brave-ventures
-    type: rss
-    url: "https://medium.com/feed/@BRaVeVentures"
   - name: disruptive-wireless
     type: rss
     url: "https://disruptivewireless.blogspot.com/feeds/posts/default"
@@ -87,9 +84,6 @@ sources:
     url: "https://blog.youtube/rss/"
 
   # --- RSS: added 2026-07-07 (researched, verified valid XML feeds) ---
-  - name: broadcast-knowledge
-    type: rss
-    url: "https://www.thebroadcastknowledge.com/feed/"   # daily curated broadcast/streaming talks & webinars
   - name: ffmpeg-news
     type: rss
     url: "https://ffmpeg.org/main.rss"                   # low volume, releases & project news
@@ -114,15 +108,6 @@ sources:
   - name: gumlet
     type: rss
     url: "https://www.gumlet.com/blog/rss/"              # video API vendor, tutorials
-  - name: disney-streaming
-    type: rss
-    url: "https://medium.com/feed/disney-streaming"
-  - name: hulu-tech
-    type: rss
-    url: "https://medium.com/feed/hulu-tech-blog"
-  - name: millicast
-    type: rss
-    url: "https://millicast.medium.com/feed"             # Dolby/Millicast WebRTC (updates rarely)
   - name: obs-blog
     type: rss
     url: "https://obsproject.com/blog/rss"               # OBS releases
@@ -160,6 +145,15 @@ sources:
   - name: habr-image-processing
     type: rss
     url: "https://habr.com/ru/rss/hub/image_processing/articles/?fl=ru"
+  - name: habr-displays
+    type: rss
+    url: "https://habr.com/ru/rss/hub/displays/articles/?fl=ru"           # Habr «Дисплеи» hub
+  - name: habr-video-conferencing
+    type: rss
+    url: "https://habr.com/ru/rss/hub/video_conferencing/articles/?fl=ru" # Habr «Видеоконференцсвязь» hub
+  - name: habr-cgi
+    type: rss
+    url: "https://habr.com/ru/rss/hub/cgi/articles/?fl=ru"                # Habr «Работа с 3D-графикой» hub
   - name: habr-ivi
     type: rss
     url: "https://habr.com/ru/rss/companies/ivi/articles/"      # ivi — RU streaming service engineering
@@ -172,12 +166,6 @@ sources:
   - name: habr-vk
     type: rss
     url: "https://habr.com/ru/rss/companies/vk/articles/"       # broad, but VK Видео engineering posts land here
-  - name: habr-cdnvideo
-    type: rss
-    url: "https://habr.com/ru/rss/companies/cdnvideo/articles/"
-  - name: habr-gcore
-    type: rss
-    url: "https://habr.com/ru/rss/companies/gcorelabs/articles/"  # CDN/streaming infra
   - name: habr-ontico
     type: rss
     url: "https://habr.com/ru/rss/companies/oleg-bunin/articles/"  # Ontico/HighLoad++ — conference talks & announcements
@@ -385,3 +373,8 @@ sources:
 #                tvnewscheck.com/playout/feed, feeds.brightcove.com/bc/all, blog.peer5.com,
 #                videodeveloper.io/feed/community
 #   LinkedIn group: no public read API; scraping violates ToS — see docs/sources-setup.md
+#
+# Removed 2026-07-07 — no posts in 3+ years (latest item shown):
+#   brave-ventures (2015-04), habr-cdnvideo (2015-09), hulu-tech (2021-05),
+#   habr-gcore (2021-12), millicast (2021-12), broadcast-knowledge (2021-07),
+#   disney-streaming (2023-02). Re-add if they resume publishing.
