@@ -23,6 +23,7 @@ class Item:
 from .bluesky import fetch_bluesky  # noqa: E402
 from .discord import fetch_discord  # noqa: E402
 from .hn import fetch_hn  # noqa: E402
+from .html import fetch_html  # noqa: E402
 from .rss import fetch_rss  # noqa: E402
 from .slack import fetch_slack  # noqa: E402
 from .telegram_web import fetch_telegram  # noqa: E402
@@ -33,6 +34,7 @@ from .telegram_web import fetch_telegram  # noqa: E402
 # sources use type: rss with the subreddit's /.rss feed.
 FETCHERS = {
     "rss": lambda src, client: fetch_rss(src.name, src.url, client),
+    "html": lambda src, client: fetch_html(src.name, src.url, client),
     "telegram": lambda src, client: fetch_telegram(src.name, src.url, client),
     "slack": fetch_slack,
     "discord": fetch_discord,

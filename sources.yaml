@@ -1,4 +1,6 @@
-# Sources for tg-grabber. type: rss | telegram | slack | discord | hn | bluesky
+# Sources for tg-grabber. type: rss | html | telegram | slack | discord | hn | bluesky
+#   html:     a blog index URL with no native feed; posts are scraped and dated via
+#             trafilatura (see grabber/fetchers/html.py)
 #   telegram: public channel username (scraped via t.me/s/<name>)
 #   slack:    "<workspace-slug>/<channel-id>"; needs a user token (see docs/sources-setup.md)
 #   discord:  "<guild-id>/<channel-id>";       needs a user token (see docs/sources-setup.md)
@@ -591,6 +593,14 @@ sources:
     type: rss
     url: "https://blog.twitch.tv/en/feed/"
     enabled: false
+
+  # --- HTML blogs (no native RSS; index scraped via trafilatura) — added 2026-07-07 ---
+  - name: fishjam
+    type: html
+    url: "https://fishjam.swmansion.com/blog"   # Software Mansion — WebRTC/MoQ/HLS, live compositing
+  - name: nimble-ape
+    type: html
+    url: "https://nimblea.pe/blog"              # Nimble Ape — WebRTC/SRT/WHIP/MoQ, CommCon organisers
 
   # --- Telegram channels (public, scraped via t.me/s/) ---
   - name: mediares_video

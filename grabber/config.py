@@ -21,7 +21,7 @@ USER_AGENT = (
 @dataclass
 class Source:
     name: str
-    type: str  # rss | telegram | slack | discord | hn | bluesky
+    type: str  # rss | html | telegram | slack | discord | hn | bluesky
     url: str
     enabled: bool = True
     prefilter: bool = True  # false = always send to LLM (single-topic feeds like GitHub releases)
