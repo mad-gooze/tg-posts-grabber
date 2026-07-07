@@ -1,5 +1,12 @@
-# Sources for tg-grabber. type: rss | telegram (telegram = public channel username, scraped via t.me/s/<name>)
+# Sources for tg-grabber. type: rss | telegram | slack | discord | hn | bluesky
+#   telegram: public channel username (scraped via t.me/s/<name>)
+#   slack:    "<workspace-slug>/<channel-id>"; needs a user token (see docs/sources-setup.md)
+#   discord:  "<guild-id>/<channel-id>";       needs a user token (see docs/sources-setup.md)
+#   hn:       Hacker News search query (Algolia)
+#   bluesky:  a handle (author feed); public API, no auth. (Reddit stays on rss — its JSON API blocks bots.)
 # Disable a source with enabled: false instead of deleting it.
+# proxy: true fetches a source through SOCKS5_PROXY from .env (for sources blocked on the
+# local network); without the flag a failed direct fetch is retried via the proxy anyway.
 
 sources:
   # --- RSS: kept from the original sources.txt (verified alive 2026-07-07) ---
@@ -339,8 +346,42 @@ sources:
     type: telegram
     url: "natexpo"            # НАТЭКСПО — RU broadcast industry expo
 
+  # --- Hacker News (Algolia search, newest-first). url = query string ---
+  - name: hn-av1
+    type: hn
+    url: "av1 codec"
+  - name: hn-ffmpeg
+    type: hn
+    url: "ffmpeg"
+
+  # --- Bluesky (public API, no auth). url = a handle → that account's posts.
+  #     "search:<query>" is also supported but the search endpoint bot-blocks unauth requests,
+  #     so stick to handles. Add the accounts you want to follow. ---
+  - name: bsky-mux
+    type: bluesky
+    url: "mux.com"
+
+  # --- YouTube channels via the existing rss fetcher (channel-feed URL; see docs/sources-setup.md) ---
+  # - name: yt-demuxed
+  #   type: rss
+  #   url: "https://www.youtube.com/feeds/videos.xml?channel_id=<CHANNEL_ID>"
+
+  # --- Slack (user token, see docs/sources-setup.md). url = "<workspace-slug>/<channel-id>".
+  #     Ships disabled until $SLACK_TOKEN and a real channel id are set. ---
+  - name: slack-example
+    type: slack
+    url: "video-dev/C00000000"   # replace channel id after joining; second workspace: token_env: SLACK_TOKEN_ACME
+    enabled: false
+
+  # --- Discord (throwaway-account user token, see docs/sources-setup.md). url = "<guild-id>/<channel-id>".
+  #     Ships disabled until $DISCORD_TOKEN and real ids are set. ---
+  - name: discord-example
+    type: discord
+    url: "000000000000000000/000000000000000000"
+    enabled: false
+
 # Removed from the original sources.txt:
 #   dead/broken: blog.streamroot.io, rss.hulu.com, scoop.it topic feed, bbc.co.uk/rd/blog/atom,
 #                tvnewscheck.com/playout/feed, feeds.brightcove.com/bc/all, blog.peer5.com,
 #                videodeveloper.io/feed/community
-#   auth-required (not scrapable by cron script): Discord, Slack, LinkedIn group
+#   LinkedIn group: no public read API; scraping violates ToS — see docs/sources-setup.md

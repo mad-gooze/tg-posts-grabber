@@ -10,7 +10,7 @@ from .fetchers import Item
 
 log = logging.getLogger(__name__)
 
-CLASSIFY_SYSTEM = """\
+_CLASSIFY_BODY = """\
 You are a content curator for the Russian Telegram channel «Страдания юного видеоинженера» \
 (“Sufferings of a young video engineer”) — a channel for video engineers about video technology.
 The authors are player/streaming engineers; the audience builds video services.
@@ -50,10 +50,20 @@ is out, and fun engineering curiosities/pet projects — don't punish these for 
 being entertaining and on-topic is the point
 - 5-6: on-topic but thin or too niche; industry/market news with only a light engineering angle
 - 0-4: marketing, duplicates of common knowledge, off-topic
+"""
 
+_CATEGORIES = "codecs|streaming|players|browser|infrastructure|perception|industry|events|tools|other"
+
+CLASSIFY_SYSTEM = _CLASSIFY_BODY + f"""
 Respond with STRICT JSON only, no markdown fences:
-{"relevant": true/false, "score": 0-10, "category": "codecs|streaming|players|browser|infrastructure|perception|industry|events|tools|other", "reason": "one short sentence"}
+{{"relevant": true/false, "score": 0-10, "category": "{_CATEGORIES}", "reason": "one short sentence"}}
 score = how well this fits the channel (10 = perfect deep-dive material)."""
+
+CLASSIFY_BATCH_SYSTEM = _CLASSIFY_BODY + f"""
+You will be given several numbered items. Respond with a STRICT JSON array only, no markdown \
+fences — exactly one object per item, in input order:
+[{{"id": 1, "relevant": true/false, "score": 0-10, "category": "{_CATEGORIES}", "reason": "one short sentence"}}, ...]
+score = how well each item fits the channel (10 = perfect deep-dive material)."""
 
 DRAFT_SYSTEM_TEMPLATE = """\
 Ты — автор русскоязычного Telegram-канала «Страдания юного видеоинженера» о видеотехнологиях: \
@@ -90,6 +100,27 @@ def _parse_json(raw: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
+def _parse_json_array(raw: str) -> list:
+    text = raw.strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    start, end = text.find("["), text.rfind("]")
+    if start == -1 or end == -1:
+        raise ValueError(f"no JSON array in LLM response: {raw[:200]!r}")
+    data = json.loads(text[start : end + 1])
+    if not isinstance(data, list):
+        raise ValueError(f"expected JSON array, got {type(data).__name__}")
+    return data
+
+
+def _normalize_cls(result: dict) -> dict:
+    return {
+        "relevant": bool(result.get("relevant")),
+        "score": int(result.get("score", 0)),
+        "category": str(result.get("category", "other")),
+        "reason": str(result.get("reason", "")),
+    }
+
+
 class LLM:
     def __init__(self, cfg: Config):
         # endpoints like eliza's /raw/anthropic speak the Anthropic Messages API,
@@ -112,58 +143,134 @@ class LLM:
         else:
             self.client = OpenAI(base_url=cfg.llm_base_url, api_key=cfg.llm_api_key)
         self.model = cfg.llm_model
+        self.classify_model = cfg.classify_model or cfg.llm_model
+        # token accounting per call kind ("classify" / "draft"), filled from response usage
+        self.usage: dict[str, dict[str, int]] = {}
         examples = "(примеров нет)"
         if STYLE_EXAMPLES.exists():
             examples = STYLE_EXAMPLES.read_text()
         self.draft_system = DRAFT_SYSTEM_TEMPLATE.format(examples=examples)
 
-    def _chat_anthropic(self, system: str, user: str) -> str:
-        resp = self.http.post(
-            f"{self.base_url}/v1/messages",
-            headers={
-                "authorization": f"OAuth {self.api_key}",
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-            },
-            json={
-                "model": self.model,
-                "max_tokens": 1024,
-                "system": system,
-                "messages": [{"role": "user", "content": user}],
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+    def _track(self, kind: str, usage: dict) -> None:
+        t = self.usage.setdefault(kind, {"calls": 0, "in": 0, "out": 0, "cache_read": 0, "cache_write": 0})
+        t["calls"] += 1
+        t["in"] += usage.get("input_tokens") or 0
+        t["out"] += usage.get("output_tokens") or 0
+        t["cache_read"] += usage.get("cache_read_input_tokens") or 0
+        t["cache_write"] += usage.get("cache_creation_input_tokens") or 0
+        log.debug("%s usage: %s", kind, usage)
 
-    def _chat(self, system: str, user: str) -> dict:
+    def usage_summary(self) -> str:
+        parts = []
+        for kind, t in self.usage.items():
+            s = f"{kind}: {t['calls']} calls, {t['in']} in / {t['out']} out"
+            if t["cache_read"] or t["cache_write"]:
+                s += f" (cache: {t['cache_read']} read, {t['cache_write']} written)"
+            parts.append(s)
+        return "; ".join(parts) or "no LLM calls"
+
+    def _chat_raw(
+        self,
+        system: str,
+        user: str,
+        kind: str,
+        model: str,
+        cache_system: bool = False,
+        max_tokens: int = 1024,
+        disable_thinking: bool = False,
+    ) -> str:
         if self.anthropic:
-            return _parse_json(self._chat_anthropic(system, user))
+            # cache_control is honored only if the prefix clears the model's minimum
+            # cacheable size (4096 tokens on current Opus) and the endpoint supports it;
+            # otherwise it's silently ignored — check usage_summary() cache counters
+            system_payload = (
+                [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+                if cache_system
+                else system
+            )
+            payload = {
+                "model": model,
+                "max_tokens": max_tokens,
+                "system": system_payload,
+                "messages": [{"role": "user", "content": user}],
+            }
+            if disable_thinking:
+                # some models (e.g. Sonnet 5) default to adaptive thinking when the
+                # field is omitted, which prepends a thinking block and spends output
+                # tokens; classification doesn't need it. (Fable 5 rejects "disabled".)
+                payload["thinking"] = {"type": "disabled"}
+            resp = self.http.post(
+                f"{self.base_url}/v1/messages",
+                headers={
+                    "authorization": f"OAuth {self.api_key}",
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            self._track(kind, data.get("usage") or {})
+            # skip any leading thinking blocks — take the first text block
+            return next(b["text"] for b in data["content"] if b.get("type") == "text")
         resp = self.client.chat.completions.create(
-            model=self.model,
+            model=model,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
             temperature=0.4,
         )
-        return _parse_json(resp.choices[0].message.content)
+        if resp.usage:
+            self._track(
+                kind,
+                {"input_tokens": resp.usage.prompt_tokens, "output_tokens": resp.usage.completion_tokens},
+            )
+        return resp.choices[0].message.content
 
     def classify(self, item: Item) -> dict:
         user = f"Source: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{item.text[:2000]}"
-        result = self._chat(CLASSIFY_SYSTEM, user)
-        return {
-            "relevant": bool(result.get("relevant")),
-            "score": int(result.get("score", 0)),
-            "category": str(result.get("category", "other")),
-            "reason": str(result.get("reason", "")),
-        }
+        raw = self._chat_raw(CLASSIFY_SYSTEM, user, "classify", self.classify_model, disable_thinking=True)
+        return _normalize_cls(_parse_json(raw))
+
+    def classify_batch(self, items: list[Item]) -> list[dict | None]:
+        """Score several items in one call — the classify system prompt dominates
+        per-call cost, so batching amortizes it. Falls back to per-item classify()
+        if the batch response doesn't parse; None marks items that failed both ways."""
+        if len(items) > 1:
+            user = "\n\n".join(
+                f"### Item {i}\nSource: {item.source}\nTitle: {item.title}\nURL: {item.url}\n\n{item.text[:1200]}"
+                for i, item in enumerate(items, 1)
+            )
+            try:
+                raw = self._chat_raw(
+                    CLASSIFY_BATCH_SYSTEM,
+                    user,
+                    "classify",
+                    self.classify_model,
+                    max_tokens=max(1024, 128 * len(items)),
+                    disable_thinking=True,
+                )
+                by_id = {int(v["id"]): v for v in _parse_json_array(raw) if isinstance(v, dict)}
+                return [_normalize_cls(by_id[i]) for i in range(1, len(items) + 1)]
+            except Exception as e:
+                log.warning("batch classify of %d items failed (%s), retrying per item", len(items), e)
+        results: list[dict | None] = []
+        for item in items:
+            try:
+                results.append(self.classify(item))
+            except Exception as e:
+                log.warning("classify failed for %s: %s", item.url, e)
+                results.append(None)
+        return results
 
     def draft(self, item: Item, category: str) -> dict:
         user = (
             f"Категория: {category}\nИсточник: {item.source}\nЗаголовок: {item.title}\n"
             f"URL: {item.url}\n\nМатериал:\n{item.text[:2500]}"
         )
-        result = self._chat(self.draft_system, user)
+        raw = self._chat_raw(self.draft_system, user, "draft", self.model, cache_system=True)
+        result = _parse_json(raw)
         title, text = str(result.get("title", "")).strip(), str(result.get("text", "")).strip()
         if not title or not text:
             raise ValueError(f"empty draft from LLM: {result!r}")

@@ -3,7 +3,9 @@
 Cron-driven content pipeline for the Telegram channel
 [«Страдания юного видеоинженера»](https://t.me/s/video_engineer_pains).
 
-Each run: fetches RSS feeds + public Telegram channels (`sources.yaml`) → dedupes against
+Each run: fetches from many sources — RSS (incl. Reddit/YouTube feeds), public Telegram channels,
+Slack, Discord, Hacker News, Bluesky (`sources.yaml`; see
+[docs/sources-setup.md](docs/sources-setup.md)) → dedupes against
 `state.sqlite` → keyword prefilter (`grabber/prefilter.py`) → classifies remaining items with
 an LLM (relevance to video engineering) → drafts posts in the channel's style (few-shot from
 `style_examples.md`) → sends drafts (title, text, source URL, image) to you via a Telegram bot.
@@ -58,9 +60,12 @@ rotating token can live in its own gitignored file.
 - `PREFILTER=0`: disable the keyword whitelist gate. By default RSS items with no
   video/audio/streaming keyword in title+text are marked `filtered` without an LLM call
   (the keyword list in `grabber/prefilter.py` is deliberately wide — false positives just
-  cost one LLM call). Telegram sources and sources with `prefilter: false` in `sources.yaml`
-  (single-topic feeds like GitHub releases, where titles are bare version numbers) bypass it.
+  cost one LLM call). Curated chat sources (telegram/slack/discord) and sources with
+  `prefilter: false` in `sources.yaml` (single-topic feeds like GitHub releases, where titles
+  are bare version numbers) bypass it.
 - `sources.yaml`: add/remove sources; `enabled: false` disables without deleting.
+- `--fetch NAME`: fetch one source and print its items (no state writes, no LLM) — use it to
+  smoke-test a new or auth'd source before a real run.
 - `--limit N`: one-off cap override for testing.
 
 ## Notes
@@ -68,5 +73,8 @@ rotating token can live in its own gitignored file.
 - Rejected items are remembered (`status=rejected` in `state.sqlite`) and never re-processed;
   transient failures (fetch/LLM/send) are *not* marked, so they retry next run.
 - Telegram sources use the public `t.me/s/<channel>` preview page (last ~20 messages, no API keys).
-- Discord/Slack/LinkedIn sources from the old `sources.txt` were dropped — they require
-  authentication; the fetcher layer is pluggable if you want to add them later.
+- Slack, Discord, Hacker News and Bluesky sources are supported — Slack and Discord need a token;
+  see [docs/sources-setup.md](docs/sources-setup.md) for how to get one. Reddit and YouTube ride the
+  `rss` fetcher (their feed URLs). LinkedIn is not supported (no public read API) and X.com's API is
+  paid, so it is not implemented. Each source type is a small fetcher in `grabber/fetchers/`
+  registered in `grabber/fetchers/__init__.py`; adding another is straightforward.

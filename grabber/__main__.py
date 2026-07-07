@@ -4,14 +4,13 @@ import logging
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from .config import Config, STATE_DB, USER_AGENT, load_config
-from .fetchers import Item
-from .fetchers.rss import fetch_rss
-from .fetchers.telegram_web import fetch_telegram
+from .config import Config, Source, STATE_DB, USER_AGENT, load_config
+from .fetchers import FETCHERS, PREFILTER_EXEMPT_TYPES, Item
 from .llm import LLM
 from .notify import Notifier
 from .prefilter import match as prefilter_match
@@ -20,14 +19,43 @@ from .state import State
 log = logging.getLogger("grabber")
 
 
+@contextmanager
+def _proxied_client(cfg: Config):
+    """Client tunneled through SOCKS5_PROXY, or None when no proxy is configured."""
+    if not cfg.socks5_proxy:
+        yield None
+        return
+    with httpx.Client(timeout=20, proxy=cfg.socks5_proxy) as client:
+        yield client
+
+
+def _fetch(fn, src: Source, direct: httpx.Client, proxied: httpx.Client | None) -> list[Item]:
+    """Blocked sources (proxy: true) go straight through the SOCKS5 proxy; the rest go
+    direct, with one proxied retry so a newly blocked source still comes through."""
+    if src.proxy:
+        if proxied is None:
+            raise RuntimeError("source has proxy: true but SOCKS5_PROXY is not set in .env")
+        return fn(src, proxied)
+    try:
+        return fn(src, direct)
+    except Exception as e:
+        if proxied is None:
+            raise
+        log.info("%s: direct fetch failed (%s), retrying via proxy — set proxy: true in sources.yaml if it is blocked", src.name, e)
+        return fn(src, proxied)
+
+
 def fetch_all(cfg: Config) -> list[Item]:
     items: list[Item] = []
-    with httpx.Client(timeout=20) as client:
+    with httpx.Client(timeout=20) as direct, _proxied_client(cfg) as proxied:
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {}
             for src in cfg.sources:
-                fn = fetch_rss if src.type == "rss" else fetch_telegram
-                futures[pool.submit(fn, src.name, src.url, client)] = src
+                fn = FETCHERS.get(src.type)
+                if fn is None:
+                    log.warning("%s: unknown source type %r, skipping", src.name, src.type)
+                    continue
+                futures[pool.submit(_fetch, fn, src, direct, proxied)] = src
             for future in as_completed(futures):
                 src = futures[future]
                 try:
@@ -39,10 +67,25 @@ def fetch_all(cfg: Config) -> list[Item]:
     return items
 
 
-def og_image(url: str) -> str | None:
+def fetch_one(cfg: Config, name: str):
+    """Fetch a single source by name and print its items — no state writes, no LLM."""
+    src = next((s for s in cfg.sources if s.name == name), None)
+    if src is None:
+        sys.exit(f"no enabled source named {name!r} (check sources.yaml and its token)")
+    fn = FETCHERS.get(src.type)
+    if fn is None:
+        sys.exit(f"unknown source type {src.type!r}")
+    with httpx.Client(timeout=20) as direct, _proxied_client(cfg) as proxied:
+        items = _fetch(fn, src, direct, proxied)
+    log.info("%s: %d items", src.name, len(items))
+    for item in items:
+        print(f"\n{'=' * 70}\n[{item.published}] {item.title}\n{item.url}\n{item.text[:500]}")
+
+
+def og_image(url: str, proxy: str | None = None) -> str | None:
     """Best-effort <meta property="og:image"> lookup on the article page."""
     try:
-        with httpx.Client(timeout=15) as client:
+        with httpx.Client(timeout=15, proxy=proxy) as client:
             resp = client.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
             resp.raise_for_status()
         m = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', resp.text) or re.search(
@@ -66,9 +109,12 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
     state = State(STATE_DB)
     cutoff = datetime.now(timezone.utc) - timedelta(days=cfg.lookback_days)
 
-    # telegram channels (hand-curated) and prefilter:false sources (single-topic
-    # feeds like GitHub releases, where titles are just "v4.2.0") bypass the keyword gate
-    prefilter_exempt = {s.name for s in cfg.sources if s.type == "telegram" or not s.prefilter}
+    # hand-curated chat sources (telegram/slack/discord) and prefilter:false sources
+    # (single-topic feeds like GitHub releases, titles just "v4.2.0") bypass the keyword gate
+    prefilter_exempt = {
+        s.name for s in cfg.sources if s.type in PREFILTER_EXEMPT_TYPES or not s.prefilter
+    }
+    proxied_sources = {s.name for s in cfg.sources if s.proxy}
 
     all_items = fetch_all(cfg)
     new_items = []
@@ -129,40 +175,45 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
         notifier = Notifier(cfg.tg_bot_token, cfg.tg_chat_id)
 
     drafted = rejected = 0
-    for item in new_items:
-        try:
-            cls = llm.classify(item)
-        except Exception as e:
-            log.warning("classify failed for %s (%s), leaving for next run", item.url, e)
-            continue
-
-        if not cls["relevant"] or cls["score"] < cfg.relevance_threshold:
-            state.mark(item.source, item.item_id, item.url, "rejected", cls["score"])
-            rejected += 1
-            log.info("rejected (%d/10) [%s] %s — %s", cls["score"], item.source, item.title[:60], cls["reason"])
-            continue
-
-        try:
-            draft = llm.draft(item, cls["category"])
-        except Exception as e:
-            log.warning("draft failed for %s (%s), leaving for next run", item.url, e)
-            continue
-
-        image = item.image_url or og_image(item.url)
-        message = format_message(draft, item, cls)
-
-        if dry_run:
-            print(f"\n{'=' * 70}\nIMAGE: {image}\n{message}")
-        else:
-            try:
-                notifier.send_draft(message, image)
-            except Exception as e:
-                log.error("send failed for %s (%s), leaving for next run", item.url, e)
+    batch_size = max(1, cfg.classify_batch_size)
+    for start in range(0, len(new_items), batch_size):
+        batch = new_items[start : start + batch_size]
+        for item, cls in zip(batch, llm.classify_batch(batch)):
+            if cls is None:
+                # classify failed even per-item (already logged); item stays unmarked for the next run
                 continue
-        state.mark(item.source, item.item_id, item.url, "drafted", cls["score"])
-        drafted += 1
+
+            if not cls["relevant"] or cls["score"] < cfg.relevance_threshold:
+                state.mark(item.source, item.item_id, item.url, "rejected", cls["score"])
+                rejected += 1
+                log.info("rejected (%d/10) [%s] %s — %s", cls["score"], item.source, item.title[:60], cls["reason"])
+                continue
+
+            try:
+                draft = llm.draft(item, cls["category"])
+            except Exception as e:
+                log.warning("draft failed for %s (%s), leaving for next run", item.url, e)
+                continue
+
+            # article pages of blocked sources are blocked too — look up og:image via proxy
+            image = item.image_url or og_image(
+                item.url, cfg.socks5_proxy if item.source in proxied_sources else None
+            )
+            message = format_message(draft, item, cls)
+
+            if dry_run:
+                print(f"\n{'=' * 70}\nIMAGE: {image}\n{message}")
+            else:
+                try:
+                    notifier.send_draft(message, image)
+                except Exception as e:
+                    log.error("send failed for %s (%s), leaving for next run", item.url, e)
+                    continue
+            state.mark(item.source, item.item_id, item.url, "drafted", cls["score"])
+            drafted += 1
 
     log.info("done: %d drafted, %d rejected, %d prefiltered, %d sent to LLM", drafted, rejected, filtered, len(new_items))
+    log.info("tokens: %s", llm.usage_summary())
     state.close()
 
 
@@ -171,6 +222,7 @@ def main():
     parser.add_argument("--init", action="store_true", help="mark all current feed items as seen; no LLM, no sends")
     parser.add_argument("--dry-run", action="store_true", help="full pipeline, but print drafts instead of sending")
     parser.add_argument("--whoami", action="store_true", help="print chat IDs from the bot's recent updates")
+    parser.add_argument("--fetch", metavar="NAME", help="fetch one source and print its items; no state, no LLM")
     parser.add_argument("--limit", type=int, default=None, help="override MAX_LLM_ITEMS_PER_RUN for this run")
     args = parser.parse_args()
 
@@ -181,6 +233,10 @@ def main():
         if not cfg.tg_bot_token:
             sys.exit("TG_BOT_TOKEN is not set in .env")
         Notifier(cfg.tg_bot_token, cfg.tg_chat_id).whoami()
+        return
+
+    if args.fetch:
+        fetch_one(cfg, args.fetch)
         return
 
     run(cfg, init_only=args.init, dry_run=args.dry_run, limit=args.limit)

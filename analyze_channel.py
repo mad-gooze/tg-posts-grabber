@@ -45,15 +45,7 @@ def fetch_all_posts(channel: str, client: httpx.Client) -> list[Item]:
     return sorted(items.values(), key=lambda it: int(it.item_id.split("/")[1]))
 
 
-def classify_with_retry(llm: LLM, item: Item) -> dict:
-    for attempt in (1, 2):
-        try:
-            return llm.classify(item)
-        except Exception as e:  # noqa: BLE001 — record and move on, one post must not kill the run
-            log.warning("classify %s failed (attempt %d): %s", item.item_id, attempt, e)
-            if attempt == 1:
-                time.sleep(2)
-    return {"relevant": None, "score": None, "category": "error", "reason": "classification failed"}
+CLS_ERROR = {"relevant": None, "score": None, "category": "error", "reason": "classification failed"}
 
 
 def build_report(channel: str, records: list[dict], threshold: int) -> str:
@@ -144,23 +136,27 @@ def main() -> None:
         posts = posts[-args.limit :]
 
     records = []
-    for i, item in enumerate(posts, 1):
-        keyword = prefilter.match(item.title, item.text)
-        cls = classify_with_retry(llm, item)
-        log.info(
-            "[%d/%d] %s prefilter=%s score=%s %s",
-            i, len(posts), item.item_id, keyword or "MISS", cls["score"], cls["reason"][:80],
-        )
-        records.append(
-            {
-                "item_id": item.item_id,
-                "url": item.url,
-                "date": item.published.isoformat() if item.published else None,
-                "title": item.title,
-                "prefilter_keyword": keyword,
-                **cls,
-            }
-        )
+    batch_size = max(1, cfg.classify_batch_size)
+    for start in range(0, len(posts), batch_size):
+        batch = posts[start : start + batch_size]
+        for offset, (item, cls) in enumerate(zip(batch, llm.classify_batch(batch)), 1):
+            cls = cls or CLS_ERROR
+            keyword = prefilter.match(item.title, item.text)
+            log.info(
+                "[%d/%d] %s prefilter=%s score=%s %s",
+                start + offset, len(posts), item.item_id, keyword or "MISS", cls["score"], cls["reason"][:80],
+            )
+            records.append(
+                {
+                    "item_id": item.item_id,
+                    "url": item.url,
+                    "date": item.published.isoformat() if item.published else None,
+                    "title": item.title,
+                    "prefilter_keyword": keyword,
+                    **cls,
+                }
+            )
+    log.info("LLM usage — %s", llm.usage_summary())
 
     json_path = f"analysis_{args.channel}.json"
     md_path = f"analysis_{args.channel}.md"

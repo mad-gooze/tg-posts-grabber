@@ -5,7 +5,7 @@ description = "Fetch video-engineering news, filter with an LLM, and send post d
 requires-python = ">=3.11"
 dependencies = [
     "feedparser>=6.0",
-    "httpx>=0.27",
+    "httpx[socks]>=0.27",
     "beautifulsoup4>=4.12",
     "openai>=1.40",
     "python-dotenv>=1.0",
