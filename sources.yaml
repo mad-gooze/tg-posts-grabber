@@ -706,12 +706,13 @@ sources:
     url: "video-dev/C00000000"   # replace channel id after joining; second workspace: token_env: SLACK_TOKEN_ACME
     enabled: false
 
-  # --- Discord (throwaway-account user token, see docs/sources-setup.md). url = "<guild-id>/<channel-id>".
-  #     Ships disabled until $DISCORD_TOKEN and real ids are set. ---
-  - name: discord-example
+  # --- Discord (throwaway-account user token, see docs/sources-setup.md). url = "<guild-id>/<channel-id>". ---
+  - name: discord-video-dev
     type: discord
-    url: "000000000000000000/000000000000000000"
-    enabled: false
+    url: "507627062434070529/1426283555360739523"
+  - name: discord-video-dev-moq
+    type: discord
+    url: "507627062434070529/1431315789054738533"
 
 # Removed from the original sources.txt:
 #   dead/broken: blog.streamroot.io, rss.hulu.com, scoop.it topic feed, bbc.co.uk/rd/blog/atom,
