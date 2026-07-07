@@ -10,6 +10,17 @@ Slack, Discord, Hacker News, Bluesky (`sources.yaml`; see
 an LLM (relevance to video engineering) → drafts posts in the channel's style (few-shot from
 `style_examples.md`) → sends drafts (title, text, source URL, image) to you via a Telegram bot.
 
+## Quick start
+
+```bash
+./bootstrap.sh
+```
+
+Interactive: prompts for every token (required and optional), installs deps into `.venv`,
+writes `.env`, seeds `state.sqlite` (`--init`, so the first run doesn't flood you), installs
+the cron entry, and does a dry-run first run. Safe to re-run. The manual steps below are the
+same thing by hand.
+
 ## Setup
 
 ```bash
