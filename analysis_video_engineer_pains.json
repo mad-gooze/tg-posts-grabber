@@ -1,0 +1,178 @@
+[
+ {
+  "item_id": "video_engineer_pains/123",
+  "url": "https://t.me/video_engineer_pains/123",
+  "date": "2025-10-23T12:59:02+00:00",
+  "title": "Нативная поддержка HLS в Google Chrome",
+  "prefilter_keyword": "аудио",
+  "relevant": true,
+  "score": 9,
+  "category": "browser",
+  "reason": "Deep dive into native HLS support landing in Chrome with technical details and implications for hls.js/DRM."
+ },
+ {
+  "item_id": "video_engineer_pains/125",
+  "url": "https://t.me/video_engineer_pains/125",
+  "date": "2025-11-18T10:55:52+00:00",
+  "title": "Позавчера определи максимальное разрешение человеческого глаза.",
+  "prefilter_keyword": "av1",
+  "relevant": true,
+  "score": 8,
+  "category": "perception",
+  "reason": "Research-based discussion of retinal resolution limits relevant to display/video engineering."
+ },
+ {
+  "item_id": "video_engineer_pains/126",
+  "url": "https://t.me/video_engineer_pains/126",
+  "date": "2025-11-19T12:11:26+00:00",
+  "title": "В догонку поста про разрешение экранов — теперь про частоту кадров!",
+  "prefilter_keyword": "кадр",
+  "relevant": true,
+  "score": 5,
+  "category": "perception",
+  "reason": "Short teaser post continuing the frame-rate perception topic, thin content on its own."
+ },
+ {
+  "item_id": "video_engineer_pains/127",
+  "url": "https://t.me/video_engineer_pains/127",
+  "date": "2025-11-19T12:11:26+00:00",
+  "title": "Холивар про то, с какой частотой надо покупать экран при том, что человек вообще-то видит примерно 24 кадра в секунду (и",
+  "prefilter_keyword": "изображен",
+  "relevant": true,
+  "score": 8,
+  "category": "perception",
+  "reason": "Detailed research on human flicker/frame-rate perception with concrete findings relevant to display tech."
+ },
+ {
+  "item_id": "video_engineer_pains/128",
+  "url": "https://t.me/video_engineer_pains/128",
+  "date": "2025-12-09T14:18:22+00:00",
+  "title": "30% просмотров в Netflix — с AV1",
+  "prefilter_keyword": "av1",
+  "relevant": true,
+  "score": 8,
+  "category": "codecs",
+  "reason": "Netflix AV1 rollout stats and roadmap from engineering blog, solid codec adoption news."
+ },
+ {
+  "item_id": "video_engineer_pains/129",
+  "url": "https://t.me/video_engineer_pains/129",
+  "date": "2025-12-25T14:31:23+00:00",
+  "title": "Коллеги, тестируете на проде?",
+  "prefilter_keyword": null,
+  "relevant": false,
+  "score": 2,
+  "category": "other",
+  "reason": "Too vague/short, no technical content visible."
+ },
+ {
+  "item_id": "video_engineer_pains/130",
+  "url": "https://t.me/video_engineer_pains/130",
+  "date": "2026-01-19T13:12:56+00:00",
+  "title": "MoQ в shaka-player",
+  "prefilter_keyword": "hls",
+  "relevant": true,
+  "score": 8,
+  "category": "players",
+  "reason": "Concrete player release news: MoQ support landing in shaka-player with demo."
+ },
+ {
+  "item_id": "video_engineer_pains/133",
+  "url": "https://t.me/video_engineer_pains/133",
+  "date": "2026-02-13T13:39:18+00:00",
+  "title": "До нас дошло S05E01.  Нофелет",
+  "prefilter_keyword": "звук",
+  "relevant": false,
+  "score": 3,
+  "category": "other",
+  "reason": "Podcast episode about IP-telephony, not video/audio engineering specific to the channel's scope."
+ },
+ {
+  "item_id": "video_engineer_pains/134",
+  "url": "https://t.me/video_engineer_pains/134",
+  "date": "2026-02-13T13:40:59+00:00",
+  "title": "Коллеги записали подкаст, в котором разобрали, как связаны появление Internet Phone и создание протоколов SIP и RTP. При",
+  "prefilter_keyword": "rtp",
+  "relevant": true,
+  "score": 7,
+  "category": "streaming",
+  "reason": "Podcast on history of SIP/RTP protocols relevant to video/audio engineering."
+ },
+ {
+  "item_id": "video_engineer_pains/135",
+  "url": "https://t.me/video_engineer_pains/135",
+  "date": "2026-03-14T09:03:51+00:00",
+  "title": "Статья Николаса Уэлла из Prime Video & Amazon MGM Studios из двух частей о том, как к 2026 году изменились ключевые техн",
+  "prefilter_keyword": "hls",
+  "relevant": true,
+  "score": 9,
+  "category": "streaming",
+  "reason": "Deep dive from Prime Video engineer on CMAF/HLS/DASH maturity and MoQ future."
+ },
+ {
+  "item_id": "video_engineer_pains/136",
+  "url": "https://t.me/video_engineer_pains/136",
+  "date": "2026-03-19T07:56:02+00:00",
+  "title": "Вебинары про видео-кодеки от IEEE SPS",
+  "prefilter_keyword": "av1",
+  "relevant": true,
+  "score": 8,
+  "category": "events",
+  "reason": "Technical IEEE SPS webinar series on video coding with concrete codec-focused program."
+ },
+ {
+  "item_id": "video_engineer_pains/137",
+  "url": "https://t.me/video_engineer_pains/137",
+  "date": "2026-03-31T22:21:44+00:00",
+  "title": "что-то у коллег 1 апреля рано началось",
+  "prefilter_keyword": null,
+  "relevant": false,
+  "score": 2,
+  "category": "other",
+  "reason": "Vague teaser post with no technical content."
+ },
+ {
+  "item_id": "video_engineer_pains/138",
+  "url": "https://t.me/video_engineer_pains/138",
+  "date": "2026-04-24T10:01:27+00:00",
+  "title": "Ленты коротких видео: как оптимизировать, чтобы вас смотрели больше",
+  "prefilter_keyword": "задержк",
+  "relevant": true,
+  "score": 8,
+  "category": "players",
+  "reason": "Engineering deep dive on short-video feed player/backend optimizations from Yandex."
+ },
+ {
+  "item_id": "video_engineer_pains/139",
+  "url": "https://t.me/video_engineer_pains/139",
+  "date": "2026-06-04T12:42:08+00:00",
+  "title": "Перевод — это липкий сверху горячий видео компрессор",
+  "prefilter_keyword": "видео",
+  "relevant": false,
+  "score": 1,
+  "category": "other",
+  "reason": "Joke/pun post with no substantive content."
+ },
+ {
+  "item_id": "video_engineer_pains/140",
+  "url": "https://t.me/video_engineer_pains/140",
+  "date": "2026-06-15T11:18:26+00:00",
+  "title": "18 июня на вебинаре буду рассказывать про продукт, которым занимаюсь в Yandex Cloud. Приходите!",
+  "prefilter_keyword": "вебинар",
+  "relevant": false,
+  "score": 3,
+  "category": "other",
+  "reason": "Generic promo announcement for a webinar without technical program details."
+ },
+ {
+  "item_id": "video_engineer_pains/141",
+  "url": "https://t.me/video_engineer_pains/141",
+  "date": "2026-06-15T11:18:26+00:00",
+  "title": "Помните, мы рассказывали, как",
+  "prefilter_keyword": "вебинар",
+  "relevant": false,
+  "score": 2,
+  "category": "other",
+  "reason": "Marketing promo for Yandex Cloud Video webinar/case study, lacking engineering depth."
+ }
+]
