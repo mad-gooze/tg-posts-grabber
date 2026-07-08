@@ -828,6 +828,9 @@ sources:
   - name: linkedin-visionular
     type: linkedin
     url: "https://www.linkedin.com/pulse/fast-av1-encoding-finally-here-visionular"  # AV1 / AI-driven encoding vendor
+  - name: linkedin-yoeri-geutskens
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/latin-america-getting-ready-world-cup-ultra-hd-yoeri-geutskens-dgrse"  # HDR/UHD format & delivery adoption tracking (low frequency)
 
   # --- YouTube channels via the existing rss fetcher (channel-feed URL; see docs/sources-setup.md) ---
   # - name: yt-demuxed
