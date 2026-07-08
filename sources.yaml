@@ -806,14 +806,28 @@ sources:
     type: bluesky
     url: "demuxed.com"            # official Demuxed conference account (added 2026-07-07)
 
-  # --- LinkedIn Pulse authors (no auth). url = a seed article URL by the author; their
-  #     recent articles are re-derived from that page each run. See docs/sources-setup.md. ---
+  # --- LinkedIn Pulse/newsletter authors (no auth). url = a seed article URL (a /pulse/
+  #     article OR a /newsletters/ issue) by the author; their recent articles are
+  #     re-derived from that page each run. Post/profile/company feeds are login-walled and
+  #     not supported — only authors are followable. See docs/sources-setup.md. ---
   - name: linkedin-dmitriy-vatolin
     type: linkedin
     url: "https://www.linkedin.com/pulse/fast-robust-device-aware-advancing-perceptual-quality-dmitriy-vatolin-6q4fe/"  # MSU video-quality research
   - name: linkedin-sudeep-kumar
     type: linkedin
     url: "https://www.linkedin.com/pulse/video-buffering-verifier-critical-buffer-model-makes-sudeep-kumar-nfuwf/"  # IPTV/streaming engineering
+  - name: linkedin-jan-ozer
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/five-views-your-encoding-ladder-jan-ozer"  # Streaming Learning Center — codec/VMAF/encoding-ladder
+  - name: linkedin-netint
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/video-processing-unit-vpu-netints-journey-superior-3zzbf"  # ASIC/VPU video infrastructure
+  - name: linkedin-fabio-sonnati
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/defeat-banding-fabio-sonnati"  # encoding optimization / VMAF / CAE
+  - name: linkedin-visionular
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/fast-av1-encoding-finally-here-visionular"  # AV1 / AI-driven encoding vendor
 
   # --- YouTube channels via the existing rss fetcher (channel-feed URL; see docs/sources-setup.md) ---
   # - name: yt-demuxed

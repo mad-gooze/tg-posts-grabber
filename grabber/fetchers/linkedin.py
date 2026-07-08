@@ -1,13 +1,20 @@
-"""LinkedIn Pulse article fetcher (no auth).
+"""LinkedIn Pulse/newsletter author fetcher (no auth).
 
 LinkedIn has no public read API, but individual Pulse articles
 (linkedin.com/pulse/<slug>) serve full HTML to an unauthenticated browser User-Agent, and
 each article page embeds a "More from <author>" block linking that author's other recent
 articles. So a source's `url` is a *seed* article URL and the fetcher re-derives the
 author's recent article list from that page every run — a stable seed keeps surfacing new
-posts (verified: an old seed page still lists the author's newest article). Profile /
-author-listing routes are login-walled (they answer HTTP 999, LinkedIn's bot block), so
-seed articles are the only unauthenticated discovery path.
+posts (verified: an old seed page still lists the author's newest article).
+
+A LinkedIn *newsletter* landing page (linkedin.com/newsletters/<slug>-<id>) works the same
+way: its issues are `/pulse/` links, so a newsletter URL is also a valid seed (the landing
+page itself is not an article and is excluded from the results).
+
+Only Pulse/newsletter *authors* are followable. Profile/company activity feeds and
+individual post pages are login-walled or carry no author-article list (they answer HTTP
+999, LinkedIn's bot block, or link only to themselves), so ongoing post/update feeds are
+not reachable without auth — the fetcher rejects such seed URLs.
 
 Everything is best-effort, matching html.py/rss.py: a post that fails to fetch or parse is
 logged and skipped rather than crashing the source. HTTP 999 (block) is treated like a
@@ -39,6 +46,9 @@ MAX_POSTS = 15
 
 # an individual Pulse article path; used to pick author-article links off the seed page
 _PULSE_PATH_RE = re.compile(r"^/pulse/[^/]+/?$")
+# valid seed URL paths: a Pulse article or a newsletter landing page (both list author
+# articles). Post/profile/company URLs are rejected — those feeds are login-walled.
+_SEED_PATH_RE = re.compile(r"^/(pulse|newsletters)/", re.IGNORECASE)
 # ld+json publish timestamp, e.g. "2026-07-04T05:15:26.000+00:00"
 _DATE_PUBLISHED_RE = re.compile(r'"datePublished"\s*:\s*"([^"]+)"')
 
@@ -61,7 +71,9 @@ def _discover_post_urls(seed_url: str, resp: httpx.Response) -> list[str]:
 
     The "More from <author>" block lists that author's own recent articles; each is
     canonicalized to scheme://host/path (query/fragment dropped) so it's a stable item id
-    across runs. The seed's own canonical URL is guaranteed to be included.
+    across runs. When the seed itself is a Pulse article its own canonical URL is included;
+    a newsletter landing-page seed is not an article, so only its discovered issue links
+    are returned.
     """
     soup = BeautifulSoup(resp.text, "html.parser")
     base = str(resp.url)  # follow_redirects may change the base
@@ -71,7 +83,8 @@ def _discover_post_urls(seed_url: str, resp: httpx.Response) -> list[str]:
         p = urlparse(urljoin(base, u))
         return f"{p.scheme}://{p.netloc}{p.path.rstrip('/')}"
 
-    out: list[str] = [canonical(base)]  # the seed article itself
+    # include the seed itself only when it is a Pulse article (not a newsletter landing page)
+    out: list[str] = [canonical(base)] if _PULSE_PATH_RE.match(bp.path) else []
     for a in soup.find_all("a", href=True):
         p = urlparse(urljoin(base, a["href"]))
         if p.netloc != bp.netloc or not _PULSE_PATH_RE.match(p.path):
@@ -110,6 +123,13 @@ def _title(meta, url: str) -> str:
 
 
 def fetch_linkedin(src, client: httpx.Client) -> list[Item]:
+    if not _SEED_PATH_RE.match(urlparse(src.url).path):
+        log.warning(
+            "%s: %s is not a Pulse/newsletter article URL — only authors are followable "
+            "(post/profile/company feeds are login-walled); skipping",
+            src.name, src.url,
+        )
+        return []
     seed = _get(client, src.url, src.name)
     if seed is None:  # blocked this run
         return []

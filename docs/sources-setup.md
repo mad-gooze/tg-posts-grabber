@@ -120,7 +120,7 @@ Get the channel ID from the channel page's HTML: view-source and search for `cha
 
 ---
 
-## LinkedIn — Pulse articles (no auth)
+## LinkedIn — Pulse/newsletter authors (no auth)
 
 LinkedIn has no public read API for group or feed content, but individual **Pulse** articles
 (`linkedin.com/pulse/<slug>`) serve full HTML to an unauthenticated browser User-Agent, and each
@@ -136,15 +136,20 @@ article page embeds a "More from `<author>`" block linking that author's other r
 - `url` is a **seed** article URL — any reasonably recent Pulse article by the author you want to
   follow. The fetcher re-derives the author's recent article list from that page on every run, so a
   stable seed keeps surfacing new posts (an old seed page still lists the author's newest article).
+- A **newsletter** landing page (`linkedin.com/newsletters/<slug>-<id>`) is also a valid seed: its
+  issues are `/pulse/` links, so the fetcher discovers them the same way (the landing page itself is
+  excluded from the results).
 - To find a seed: open the author's article on LinkedIn (logged in or not) and copy its
   `/pulse/…` URL. Tracking query params are stripped automatically.
-- Profile and `…/today/author/<slug>` listing routes are login-walled (they answer HTTP 999,
-  LinkedIn's bot block), so a Pulse article URL is the only unauthenticated entry point. A `999` on a
-  given run is treated like a rate-limit: that fetch is skipped and retried next run.
+- A `999` on a given run (LinkedIn's bot block) is treated like a rate-limit: that fetch is skipped
+  and retried next run.
 
-Only individual authors are reachable this way — **group** and personal-feed content still have no
-public read path (the official Community Management API is gated behind partner approval, and scraping
-a logged-in session violates ToS), so those remain unsupported.
+**Only authors are followable.** Ongoing **post/activity feeds** (`/posts/…`, `/feed/…`), profiles
+(`/in/…`, `…/today/author/…`), and company pages are login-walled (they answer HTTP 999) or carry no
+author-article list, so they cannot be followed without auth — the fetcher rejects such seed URLs with
+a warning. **Group** and personal-feed content likewise has no public read path (the official
+Community Management API is gated behind partner approval, and scraping a logged-in session violates
+ToS), so those remain unsupported.
 
 ## X.com — not implemented
 
