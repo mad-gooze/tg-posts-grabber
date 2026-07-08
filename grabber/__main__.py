@@ -150,6 +150,8 @@ def format_message(draft: dict, group: Group, classification: dict) -> str:
     rep = group.representative
     header = f"📝 <b>{html.escape(draft['title'])}</b>\n\n{draft['text']}\n\n"
     tag = f"#{classification['category']} · score {classification['score']}"
+    if rep.published:
+        tag += f" · 📅 {rep.published:%Y-%m-%d}"
 
     if len(group.members) == 1:
         link = f"🔗 <a href=\"{html.escape(rep.url)}\">{html.escape(rep.url)}</a>\n" if rep.url else ""
