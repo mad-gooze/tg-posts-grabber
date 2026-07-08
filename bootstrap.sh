@@ -118,11 +118,18 @@ bold "tg-grabber bootstrap"
 [ -f "$SCRIPT_DIR/.env.example" ] || die ".env.example not found — run this from a tg-grabber clone."
 [ -f "$SCRIPT_DIR/pyproject.toml" ] || die "pyproject.toml not found — run this from a tg-grabber clone."
 
-command -v python3 >/dev/null 2>&1 || die "python3 not found on PATH."
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
-    die "Python 3.11+ required (found $(python3 -V 2>&1))."
-fi
-info "Python: $(python3 -V 2>&1)"
+# Pick an interpreter to build the venv with. Debian/Ubuntu ship an older python3
+# next to a versioned python3.11, so probe versioned names before falling back to python3.
+PYTHON_BIN=""
+for cand in python3.13 python3.12 python3.11 python3; do
+    command -v "$cand" >/dev/null 2>&1 || continue
+    if "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+        PYTHON_BIN="$cand"
+        break
+    fi
+done
+[ -n "$PYTHON_BIN" ] || die "Python 3.11+ required (found $(python3 -V 2>&1 || echo 'no python3'))."
+info "Python: $("$PYTHON_BIN" -V 2>&1) ($PYTHON_BIN)"
 
 # ---------------------------------------------------------------------------
 # 2. Venv + deps (uv when available; dependencies read from pyproject.toml)
@@ -137,7 +144,7 @@ if [ ! -x "$PY" ]; then
         uv venv "$VENV" >/dev/null
     else
         info "Creating venv at .venv"
-        python3 -m venv "$VENV"
+        "$PYTHON_BIN" -m venv "$VENV"
     fi
 else
     info "Reusing existing .venv"
