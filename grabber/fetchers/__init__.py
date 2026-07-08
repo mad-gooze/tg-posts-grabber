@@ -24,6 +24,7 @@ from .bluesky import fetch_bluesky  # noqa: E402
 from .discord import fetch_discord  # noqa: E402
 from .hn import fetch_hn  # noqa: E402
 from .html import fetch_html  # noqa: E402
+from .linkedin import fetch_linkedin  # noqa: E402
 from .rss import fetch_rss  # noqa: E402
 from .slack import fetch_slack  # noqa: E402
 from .telegram_web import fetch_telegram  # noqa: E402
@@ -38,6 +39,7 @@ FETCHERS = {
         src.name, src.url, client, post_pattern=src.post_pattern or None, post_exclude=src.post_exclude or None
     ),
     "telegram": lambda src, client: fetch_telegram(src.name, src.url, client),
+    "linkedin": fetch_linkedin,
     "slack": fetch_slack,
     "discord": fetch_discord,
     "hn": fetch_hn,

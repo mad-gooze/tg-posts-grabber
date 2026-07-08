@@ -1,9 +1,11 @@
-# Sources for tg-grabber. type: rss | html | telegram | slack | discord | hn | bluesky
+# Sources for tg-grabber. type: rss | html | telegram | linkedin | slack | discord | hn | bluesky
 #   html:     a blog index URL with no native feed; posts are scraped and dated via
 #             trafilatura (see grabber/fetchers/html.py). Optional post_pattern (regex
 #             matched against a link's URL path) selects posts when they don't sit one
 #             segment below the blog path; post_exclude drops false positives.
 #   telegram: public channel username (scraped via t.me/s/<name>)
+#   linkedin: a seed Pulse article URL by an author to follow; their recent articles are
+#             re-derived from that page each run (no auth). See docs/sources-setup.md.
 #   slack:    "<workspace-slug>/<channel-id>"; needs a user token (see docs/sources-setup.md)
 #   discord:  "<guild-id>/<channel-id>";       needs a user token (see docs/sources-setup.md)
 #   hn:       Hacker News search query (Algolia)
@@ -804,6 +806,15 @@ sources:
     type: bluesky
     url: "demuxed.com"            # official Demuxed conference account (added 2026-07-07)
 
+  # --- LinkedIn Pulse authors (no auth). url = a seed article URL by the author; their
+  #     recent articles are re-derived from that page each run. See docs/sources-setup.md. ---
+  - name: linkedin-dmitriy-vatolin
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/fast-robust-device-aware-advancing-perceptual-quality-dmitriy-vatolin-6q4fe/"  # MSU video-quality research
+  - name: linkedin-sudeep-kumar
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/video-buffering-verifier-critical-buffer-model-makes-sudeep-kumar-nfuwf/"  # IPTV/streaming engineering
+
   # --- YouTube channels via the existing rss fetcher (channel-feed URL; see docs/sources-setup.md) ---
   # - name: yt-demuxed
   #   type: rss
@@ -829,6 +840,7 @@ sources:
 #                tvnewscheck.com/playout/feed, feeds.brightcove.com/bc/all, blog.peer5.com,
 #                videodeveloper.io/feed/community
 #   LinkedIn group: no public read API; scraping violates ToS — see docs/sources-setup.md
+#     (individual Pulse *authors* are supported via type: linkedin; groups/feeds are not)
 #
 # Removed 2026-07-07 — no posts in 3+ years (latest item shown):
 #   brave-ventures (2015-04), habr-cdnvideo (2015-09), hulu-tech (2021-05),

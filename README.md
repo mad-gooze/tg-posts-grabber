@@ -113,6 +113,7 @@ generates the units, or write them by hand under `~/.config/systemd/user/`). Ena
 - Telegram sources use the public `t.me/s/<channel>` preview page (last ~20 messages, no API keys).
 - Slack, Discord, Hacker News and Bluesky sources are supported — Slack and Discord need a token;
   see [docs/sources-setup.md](docs/sources-setup.md) for how to get one. Reddit and YouTube ride the
-  `rss` fetcher (their feed URLs). LinkedIn is not supported (no public read API) and X.com's API is
-  paid, so it is not implemented. Each source type is a small fetcher in `grabber/fetchers/`
+  `rss` fetcher (their feed URLs). LinkedIn is supported for individual **Pulse authors** via the
+  `linkedin` type (seed a source with any of the author's article URLs; groups/feeds have no public
+  read path). X.com's API is paid, so it is not implemented. Each source type is a small fetcher in `grabber/fetchers/`
   registered in `grabber/fetchers/__init__.py`; adding another is straightforward.

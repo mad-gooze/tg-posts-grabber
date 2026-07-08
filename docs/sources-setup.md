@@ -120,12 +120,31 @@ Get the channel ID from the channel page's HTML: view-source and search for `cha
 
 ---
 
-## LinkedIn — not supported
+## LinkedIn — Pulse articles (no auth)
 
-LinkedIn has no public read API for group or feed content (the official Community Management API is
-gated behind partner approval), and scraping a logged-in session violates their ToS and is
-aggressively blocked. Not worth the account-restriction risk for low-volume group content, so it is
-intentionally left out.
+LinkedIn has no public read API for group or feed content, but individual **Pulse** articles
+(`linkedin.com/pulse/<slug>`) serve full HTML to an unauthenticated browser User-Agent, and each
+article page embeds a "More from `<author>`" block linking that author's other recent articles. The
+`linkedin` fetcher exploits this to follow specific authors:
+
+```yaml
+  - name: linkedin-dmitriy-vatolin
+    type: linkedin
+    url: "https://www.linkedin.com/pulse/<any-recent-article-by-the-author>/"
+```
+
+- `url` is a **seed** article URL — any reasonably recent Pulse article by the author you want to
+  follow. The fetcher re-derives the author's recent article list from that page on every run, so a
+  stable seed keeps surfacing new posts (an old seed page still lists the author's newest article).
+- To find a seed: open the author's article on LinkedIn (logged in or not) and copy its
+  `/pulse/…` URL. Tracking query params are stripped automatically.
+- Profile and `…/today/author/<slug>` listing routes are login-walled (they answer HTTP 999,
+  LinkedIn's bot block), so a Pulse article URL is the only unauthenticated entry point. A `999` on a
+  given run is treated like a rate-limit: that fetch is skipped and retried next run.
+
+Only individual authors are reachable this way — **group** and personal-feed content still have no
+public read path (the official Community Management API is gated behind partner approval, and scraping
+a logged-in session violates ToS), so those remain unsupported.
 
 ## X.com — not implemented
 
