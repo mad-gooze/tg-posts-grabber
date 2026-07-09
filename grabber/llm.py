@@ -62,10 +62,21 @@ measurement methodology, or tooling deep-dives (how a metric or encoder actually
 - Minor releases: bug-fix / patch / point / beta / RC / nightly / unstable / development-snapshot \
 releases, dependency bumps and routine version tags. CAP THESE AT 5 — they are never 7+, no matter \
 how long the changelog. A release earns 7+ ONLY when the item itself names a major/milestone release \
-OR a specific notable new capability (new codec/format support, a big performance win, a new API). \
+OR a specific notable new capability (new codec/format support, a big performance win, a new API) — \
+and this new-capability exception is for widely-used / open-source tooling; a closed-source \
+commercial product's own release is governed by "Commercial/proprietary product releases" below. \
 A title that is just a bare version number with no headline feature ("v3.2.0", "v1.7.0-beta.1", \
 "1.29.2 unstable development snapshot", "1.28.4 stable bug-fix release") is a minor release → 4-5. \
 "FFmpeg 8.1" or "FFmpeg gains a native VVC decoder" → high
+- Commercial/proprietary product releases: a closed-source vendor shipping an update to its OWN \
+product (Red5 Pro, Wowza, Nimble Streamer, Ateme, Axinom, Harmonic, Bitmovin, THEO…) — even one \
+whose changelog headlines a "new" but already-established codec/protocol/API (e.g. adding AV1 or \
+HEVC ingest to their product) — is product news, not industry news. CAP THESE BELOW 7 (usually 4-6). \
+They earn 7+ ONLY when the release is genuinely important to the whole industry: an industry-first \
+capability, a standard-setting move, or something that materially changes what video engineers \
+across the field can do — not merely that this one product now supports a codec that already exists \
+elsewhere. Contrast open-source / widely-used tooling (FFmpeg, GStreamer, dav1d, SVT-AV1, hls.js, \
+dash.js, shaka-player…), where a genuine new-capability release stays 7+.
 - Vendor/SEO content: generic "best practices", listicles ("N things that break…"), 101-explainers, \
 product-sunset/pricing notices, and promo posts that name-drop technology without specific engineering \
 substance, data or a novel angle — even on a vendor's engineering blog. (A vendor post with real \
@@ -81,7 +92,8 @@ conferences/meetups (Demuxed, VideoTech, RTC@Scale…) even before the full prog
 genuinely clever/surprising engineering curiosities/pet projects with a hook — reward these even if \
 short, being entertaining and on-topic is the point
 - 5-6: on-topic but thin, too niche or not newsworthy — routine hobbyist results/Q&A, minor/bug-fix \
-releases, generic vendor/SEO explainers, industry/market news with only a light engineering angle
+releases, commercial vendor product releases without industry-wide impact, generic vendor/SEO \
+explainers, industry/market news with only a light engineering angle
 - 0-4: marketing, duplicates of common knowledge, off-topic
 """
 
