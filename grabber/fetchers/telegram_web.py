@@ -11,6 +11,49 @@ from . import Item
 log = logging.getLogger(__name__)
 
 BG_IMAGE_RE = re.compile(r"background-image:\s*url\('([^']+)'\)")
+# a public, single-message t.me URL: https://t.me/<channel>/<id>. Excludes /s/ (the
+# preview listing) and /c/ (private channels, not publicly linkable).
+POST_URL_RE = re.compile(r"^https?://t\.me/(?!s/|c/)[A-Za-z0-9_]+/\d+")
+
+
+def _forwarded_from(msg) -> str | None:
+    """The t.me post URL a message widget was forwarded from, or None when it's original.
+    Telegram links the forward header to the source post; a channel-only link (no post id,
+    e.g. a private source) is dropped since there is no single original post to point at."""
+    a = msg.select_one("a.tgme_widget_message_forwarded_from_name[href]")
+    if not a:
+        return None
+    href = a["href"].split("?", 1)[0]
+    return href if POST_URL_RE.match(href) else None
+
+
+def resolve_original(start_url: str, client: httpx.Client, max_hops: int = 5) -> str:
+    """Walk a forward chain from `start_url` (a post's immediate forward source) to the
+    deepest publicly-linkable original post, returning its URL.
+
+    `start_url` is already known from the listing page, so this only fetches hops 2..N:
+    each hop opens the post's embed page and reads *its* forward header. Stops at the first
+    original post, a private/unlinkable hop, a cycle, or `max_hops`. Never raises — a failed
+    hop just returns the deepest URL reached so far (at worst `start_url` itself)."""
+    original = current = start_url
+    seen = {start_url}
+    for _ in range(max_hops):
+        try:
+            resp = client.get(
+                current + ("&" if "?" in current else "?") + "embed=1",
+                headers={"User-Agent": USER_AGENT},
+                follow_redirects=True,
+            )
+            resp.raise_for_status()
+            nxt = _forwarded_from(BeautifulSoup(resp.text, "html.parser"))
+        except Exception as e:
+            log.info("forward-chain lookup failed at %s (%s)", current, e)
+            break
+        if not nxt or nxt in seen:
+            break
+        seen.add(nxt)
+        original = current = nxt
+    return original
 
 
 def fetch_telegram(
@@ -65,6 +108,7 @@ def fetch_telegram(
                 text=text[:3000],
                 published=published,
                 image_url=image_url,
+                forwarded_from_url=_forwarded_from(msg) or "",
             )
         )
     return items

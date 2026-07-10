@@ -17,6 +17,9 @@ class Item:
     # cross-source dedup key, filled by the pipeline after prefilter (see grabber/dedup.py)
     norm_url: str = ""
     simhash: int = 0
+    # telegram only: the t.me URL this post was forwarded/reposted from (immediate origin).
+    # The pipeline walks it back to the ultimate original when drafting (see resolve_original).
+    forwarded_from_url: str = ""
 
 
 # Submodules do `from . import Item`, so these imports must come after the dataclass.

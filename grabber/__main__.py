@@ -14,6 +14,7 @@ from .config import CONTENT_FETCH_SKIP_TYPES, Config, Source, STATE_DB, USER_AGE
 from .content import fetch_content_meta
 from .dedup import content_key, hamming_close, normalize_url
 from .fetchers import FETCHERS, PREFILTER_EXEMPT_TYPES, Item
+from .fetchers.telegram_web import resolve_original
 from .llm import LLM
 from .notify import Notifier
 from .prefilter import match as prefilter_match
@@ -146,16 +147,45 @@ def og_image(url: str, proxy: str | None = None) -> str | None:
         return None
 
 
-def format_message(draft: dict, group: Group, classification: dict) -> str:
+def original_post_link(rep: Item, cfg: Config, proxied_sources: set[str]) -> str | None:
+    """For a Telegram representative that is a forward/repost, walk the forward chain back to
+    the deepest original post and return its URL. None when the rep isn't a forward. Blocked
+    telegram sources are followed through the SOCKS5 proxy, same as the fetch."""
+    if not rep.forwarded_from_url:
+        return None
+    proxy = cfg.socks5_proxy if rep.source in proxied_sources else None
+    try:
+        with httpx.Client(timeout=15, proxy=proxy) as client:
+            return resolve_original(rep.forwarded_from_url, client)
+    except Exception as e:
+        log.info("original-link resolution failed for %s (%s)", rep.url, e)
+        return rep.forwarded_from_url  # at least the immediate origin we already knew
+
+
+def _original_line(original_url: str | None, member_urls: set[str]) -> str:
+    """A '↳ оригинал: <link>' line for a forwarded post, or '' when there is no distinct
+    original (the post is not a forward, or its origin is one of the sources already shown)."""
+    if not original_url or original_url in member_urls:
+        return ""
+    if any(normalize_url(original_url) == (normalize_url(u) or u) for u in member_urls):
+        return ""
+    esc = html.escape(original_url)
+    return f"↳ оригинал: <a href=\"{esc}\">{esc}</a>\n"
+
+
+def format_message(draft: dict, group: Group, classification: dict, original_url: str | None = None) -> str:
     rep = group.representative
     header = f"📝 <b>{html.escape(draft['title'])}</b>\n\n{draft['text']}\n\n"
     tag = f"#{classification['category']} · score {classification['score']}"
     if rep.published:
         tag += f" · 📅 {rep.published:%Y-%m-%d}"
 
+    member_urls = {m.url for m in group.members if m.url}
+    orig_line = _original_line(original_url, member_urls)
+
     if len(group.members) == 1:
         link = f"🔗 <a href=\"{html.escape(rep.url)}\">{html.escape(rep.url)}</a>\n" if rep.url else ""
-        return header + link + f"{tag} · {html.escape(rep.source)}"
+        return header + link + orig_line + f"{tag} · {html.escape(rep.source)}"
 
     # multi-source: one link per distinct source URL, representative first so the web
     # preview uses it; de-dup by normalized URL (two members can share a link)
@@ -177,7 +207,7 @@ def format_message(draft: dict, group: Group, classification: dict) -> str:
         extra = f"\n• +{len(links) - MAX_SOURCE_LINKS} ещё"
         links = links[:MAX_SOURCE_LINKS]
     sources_block = "🔗 Источники:\n" + "\n".join(links) + extra + "\n"
-    return header + sources_block + f"{tag} · {n_sources} sources"
+    return header + sources_block + orig_line + f"{tag} · {n_sources} sources"
 
 
 def _mark_group(state: State, group: Group, status: str, score: int | None = None):
@@ -430,7 +460,8 @@ def run(cfg: Config, init_only: bool, dry_run: bool, limit: int | None):
         image = rep.image_url
         if not image and rep.url:
             image = og_image(rep.url, cfg.socks5_proxy if rep.source in proxied_sources else None)
-        message = format_message(draft, group, cls)
+        original_url = original_post_link(rep, cfg, proxied_sources)
+        message = format_message(draft, group, cls, original_url)
 
         if dry_run:
             print(f"\n{'=' * 70}\nIMAGE: {image}\n{message}")
